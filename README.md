@@ -1,22 +1,24 @@
 <div align="center">
 
-# idalib-cli
+# <img src="assets/icon.svg" width="40" valign="middle" alt="idalib-cli logo"/> idalib-cli
 
 **Agent-native CLI for the IDA Pro IDALib — built on [idalib-rs](https://github.com/idalib-rs/idalib)**
 
 [![IDA](https://img.shields.io/badge/IDA_Pro-9.1-blue)](https://hex-rays.com/ida-pro)
 [![idalib-rs](https://img.shields.io/badge/idalib--rs-0.6.1-orange)](https://github.com/idalib-rs/idalib)
 [![Version](https://img.shields.io/badge/version-0.9.1-green)](#versions--branches)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-lightgrey)](#license)
+[![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](#license)
 
 **English** · [简体中文](README.zh-CN.md)
 
 </div>
 
-A single-binary CLI that exposes IDA analysis as structured JSON — designed to
-be driven by code agents (Codex, Claude Code, OpenCode) or humans. Manage
-multiple independent, stateful analysis sessions, each backed by its own IDB,
-and run them concurrently across processes.
+A single-binary, **stateless** CLI that exposes IDA analysis as structured
+JSON — designed to be driven by code agents (Codex, Claude Code, OpenCode) or
+humans. Every command takes `-d/--db <PATH>`: an IDB file (`.i64`) or a binary
+(an IDB is created next to it on first use). All state lives in the IDB file —
+comments, bookmarks, names and analysis survive across invocations, and many
+databases can be processed concurrently across processes.
 
 ---
 
@@ -24,11 +26,11 @@ and run them concurrently across processes.
 
 | | |
 | --- | --- |
-| 💾 **Sessions** | Independent, stateful analysis sessions; registry persisted in `~/.idapro/idalib-cli/sessions.json` |
-| 🗄️ **Persistent IDB** | Each session maps to an `.i64` file — comments, bookmarks, names, analysis survive across processes |
+| 💾 **Stateless** | `-d/--db <PATH>` on every command — no daemon, no registry, no session bookkeeping |
+| 🗄️ **Persistent IDB** | The IDB file *is* the state — comments, bookmarks, names, analysis survive across processes |
 | 🧩 **Full IDALib coverage** | Segments, functions, CFG, disassembly, Hex-Rays, strings, names, xrefs, entries, metadata, comments, bookmarks, FLIRT |
-| ⚡ **Batch & parallel** | `batch` = several commands in one process; `parallel` = one command fanned out to many sessions |
-| 🤖 **Agent-first** | JSON on stdout everywhere; global `-s/--session`; skills included for agents |
+| ⚡ **Batch & parallel** | `batch` = several commands, IDB opened once; `parallel` = one command fanned out to many databases (glob/list supported) |
+| 🤖 **Agent-first** | JSON on stdout everywhere; one uniform `-d` flag; skills included for agents |
 
 ## Install
 
@@ -66,30 +68,27 @@ idalib-cli info    # ✅ verify: tool version, IDA version, license
 ## Quick start
 
 ```sh
-idalib-cli session open -b ./target.bin -o ./target.i64   # 1. create a session
-idalib-cli batch -- "meta" "segments" "strings" "functions -u"   # 2. overview
-idalib-cli decompile -s 1 -a 0x401000                     # 3. Hex-Rays pseudo-code
-idalib-cli comments set -s 1 -a 0x401000 -c "note"        # 4. annotate (persisted)
-idalib-cli parallel -- "decompile -a 0x401000"            # 5. fan out to all sessions
+idalib-cli -d ./target.bin functions                      # 1. analyse (IDB auto-created)
+idalib-cli -d ./target.bin batch -- "meta" "segments" "strings" "functions -u"   # 2. overview
+idalib-cli -d ./target.i64 decompile -a 0x401000          # 3. Hex-Rays pseudo-code
+idalib-cli -d ./target.bin comments set -a 0x401000 -c "note"    # 4. annotate (persisted)
+idalib-cli parallel -d "./a.i64,./b.i64" -- "functions -u"       # 5. fan out to many DBs
 ```
 
 ## Command reference
 
-> Global: `-s/--session <ID>` selects the session (falls back to the first
-> ready one) · `-j/--json` forces JSON (already the default) · addresses
-> accept `0x401000` or `401000`
+> Global: `-d/--db <PATH>` selects the database (an `.i64` or a binary) —
+> required by every command · `-j/--json` forces JSON (already the default) ·
+> addresses accept `0x401000` or `401000`
 
 <details>
-<summary><b>Session management</b></summary>
+<summary><b>Database management</b></summary>
 
 ```sh
-idalib-cli session open    -b <bin> [-o <idb>] [-n name] [--save] [--auto-analyse]
-idalib-cli session list
-idalib-cli session show    -s <id>
-idalib-cli session close   -s <id> [--save true|false]
-idalib-cli session save    -s <id>
-idalib-cli session analyze -s <id> [--wait]
-idalib-cli session remove  -s <id>
+idalib-cli -d <bin-or-i64> db info      # paths, IDB state, size
+idalib-cli -d <bin-or-i64> db close     # flush (state is already saved per-op)
+idalib-cli db remove -d <bin-or-i64>    # delete the IDB (never the binary)
+idalib-cli -d <bin> db open [--save/--auto-analyse]   # explicit open + analysis
 ```
 
 </details>
@@ -128,12 +127,12 @@ idalib-cli signatures --make [--only-pat]      # generate FLIRT signatures
 <summary><b>Batch & parallel</b></summary>
 
 ```sh
-# sequential, one process, one session
-idalib-cli batch -- "meta" "segments" "decompile -a 0x401000"
+# sequential, one process, IDB opened once
+idalib-cli -d ./target.bin batch -- "meta" "segments" "decompile -a 0x401000"
 
-# one command, many sessions (one subprocess per session)
-idalib-cli parallel -- "functions -u"           # all sessions
-idalib-cli parallel -S 1,2,3 --jobs 4 -- "strings"
+# one command, many databases (one subprocess each); comma list or glob
+idalib-cli parallel -d "./a.i64,./b.i64" -- "functions -u"
+idalib-cli parallel -d "./samples/*.i64" --jobs 4 -- "strings"
 ```
 
 </details>
@@ -168,6 +167,7 @@ Optional `~/.idapro/idalib-cli/config.toml` (base dir overridable via
 [defaults]
 idadir = "/Applications/IDA Professional 9.1.app/Contents/MacOS"
 idb_dir = "~/ida_out"      # default IDB location (otherwise next to the binary)
+default_db = "~/idbs/main.i64"   # used when -d is omitted
 save = true
 auto_analyse = true
 ```
@@ -176,13 +176,13 @@ By default an IDB is created next to the analysed binary (`<binary>.i64`).
 
 ## Architecture notes
 
-Flow: **load config → restore session registry → run op (open IDB from disk →
-query → save) → persist registry**.
+Flow: **load config → resolve `-d/--db` → open IDB from disk (or create next
+to the binary) → run op → save → exit**.
 
-- A **session** = one binary + one IDB file + a registry record. The IDB file
-  is the source of truth → sessions are independent, stateful across
+- **Stateless**: no daemon, no registry, no session records. The IDB file is
+  the single source of truth, so databases are independent, stateful across
   invocations, and safe to run concurrently.
-- `parallel` isolates by process (one subprocess per session) — IDALib is not
+- `parallel` isolates by process (one subprocess per database) — IDALib is not
   thread-safe for concurrent in-process DB use.
 - Output contract: one JSON document on stdout; errors to stderr, non-zero exit.
 - Bundled upstream workarounds: `EntryPointIter` infinite-loop fix (0.6.1),
@@ -211,4 +211,7 @@ and validates their license. **Never commit or redistribute the IDA SDK.**
 
 ## License
 
-MIT OR Apache-2.0, matching [idalib-rs](https://github.com/idalib-rs/idalib).
+Distributed under the [Apache License 2.0](LICENSE). The `license` field in
+`Cargo.toml` declares `MIT OR Apache-2.0` for compatibility with
+[idalib-rs](https://github.com/idalib-rs/idalib) dependencies; this repository
+ships the Apache-2.0 text only.

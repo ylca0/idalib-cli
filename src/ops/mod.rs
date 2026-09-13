@@ -1,9 +1,9 @@
 pub mod batch;
 pub mod bookmarks;
 pub mod comments;
+pub mod db;
 pub mod info;
 pub mod metadata;
 pub mod parallel;
-pub mod sessions;
 pub mod signatures;
 pub mod top;

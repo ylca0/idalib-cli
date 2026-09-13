@@ -346,17 +346,12 @@ pub struct CommentView {
 }
 
 #[derive(Serialize, Debug)]
-pub struct SessionView {
-    pub id: String,
-    pub name: String,
-    pub state: String,
-    pub created_at: String,
-    pub idb: Option<String>,
+pub struct DbView {
+    pub input: String,
     pub binary: Option<String>,
-    pub auto_analyse: Option<bool>,
-    pub save: Option<bool>,
-    pub ready: bool,
-    pub error: Option<String>,
+    pub idb: String,
+    pub idb_exists: bool,
+    pub size_bytes: u64,
 }
 
 #[derive(Serialize, Debug)]

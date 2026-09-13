@@ -1,13 +1,15 @@
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::cli::{self, Command};
-use crate::session::session::{SessionId, SessionState};
-use crate::session::session_manager::SessionManager;
+use crate::idalib::idb::{IDB, IDBOpenOptions};
+use crate::session::config::Config;
 
 /// Top-level command output. Every command ultimately returns one of these,
-/// which is serialised as JSON (or rendered as text) to stdout.
+/// which is serialised as JSON on stdout.
 #[derive(Serialize, Debug)]
 #[serde(untagged)]
 pub enum Out {
@@ -17,8 +19,7 @@ pub enum Out {
     I32(i32),
     String(String),
     Value(Value),
-    Session(crate::helpers::json_types::SessionView),
-    Sessions(Vec<crate::helpers::json_types::SessionView>),
+    Db(crate::helpers::json_types::DbView),
     Ok(crate::helpers::json_types::OkView),
     Segment(crate::helpers::json_types::SegmentView),
     Segments(Vec<crate::helpers::json_types::SegmentView>),
@@ -36,152 +37,121 @@ pub enum Out {
     Comment(crate::helpers::json_types::CmtView),
     Bookmark(crate::helpers::json_types::BookmarkView),
     Bookmarks(crate::helpers::json_types::BookmarksOut),
-    BookmarksList(Vec<crate::helpers::json_types::BookmarkView>),
     Version(crate::helpers::json_types::VersionView),
     VersionInfo(crate::helpers::json_types::VersionInfo),
     License(crate::helpers::json_types::LicenseView),
 }
 
-pub fn dispatch(cli: &cli::Cli, mgr: &mut SessionManager) -> Result<()> {
-    let out = run(cli, mgr)?;
+pub fn dispatch(cli: &cli::Cli) -> Result<()> {
+    let out = run(cli)?;
     print_out(&out);
     Ok(())
 }
 
-pub fn run(cli: &cli::Cli, mgr: &mut SessionManager) -> Result<Out> {
+pub fn run(cli: &cli::Cli) -> Result<Out> {
     match &cli.command {
         Command::Info(i) => crate::ops::info::run(i),
-        Command::Session(s) => crate::ops::sessions::run(mgr, s, cli.session),
-        Command::Segments(_) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Segments(crate::ops::metadata::segments(idb)))
-        }),
-        Command::SegmentsByRange(r) => {
-            with_idb(
-                mgr,
-                cli.session,
-                |idb| match crate::ops::metadata::segment_at(idb, r.address) {
-                    Some(s) => Ok(Out::Segment(s)),
-                    None => Ok(Out::Null),
-                },
-            )
-        }
-        Command::Functions(f) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Functions(crate::ops::metadata::functions(idb, f.user)))
-        }),
-        Command::Function(f) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::FunctionDetail(crate::ops::metadata::function(
-                idb, f.address,
-            )?))
-        }),
-        Command::Disasm(d) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Insns(crate::ops::metadata::disasm(
-                idb, d.address, d.count,
-            )?))
-        }),
-        Command::Decompile(d) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Function(crate::ops::metadata::decompile(
-                idb,
-                d.address,
-                d.all_blocks,
-            )?))
-        }),
-        Command::Strings(s) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Strings(crate::ops::metadata::strings(idb, s.all)))
-        }),
-        Command::Names(_) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Names(crate::ops::metadata::names(idb)))
-        }),
-        Command::Xrefs(x) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Xrefs(crate::ops::metadata::xrefs(
-                idb, x.address, x.all,
-            )?))
-        }),
-        Command::Entries(_) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Entries(crate::ops::metadata::entries(idb)))
-        }),
-        Command::Meta(_) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Metadata(crate::ops::metadata::meta(idb)))
-        }),
-        Command::Processor(_) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Processor(crate::ops::metadata::processor(idb)))
-        }),
-        Command::Insn(i) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Insn(crate::ops::metadata::insn(idb, i.address)?))
-        }),
-        Command::Comments(c) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Comment(crate::ops::comments::dispatch(idb, c)?))
-        }),
-        Command::Bookmarks(b) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Bookmarks(crate::ops::bookmarks::dispatch(idb, b)?))
-        }),
-        Command::Signatures(s) => with_idb(mgr, cli.session, |idb| {
-            Ok(Out::Ok(crate::ops::signatures::dispatch(idb, s)?))
-        }),
-        Command::Batch(b) => crate::ops::batch::run(mgr, b),
-        Command::Parallel(p) => crate::ops::parallel::run(mgr, p),
+        Command::Db(s) => crate::ops::db::run(s, cli.db.as_deref()),
+        Command::Batch(b) => crate::ops::batch::run(cli, b),
+        Command::Parallel(p) => crate::ops::parallel::run(p),
+        _ => with_idb(cli, |idb| run_db_op(cli, idb)),
     }
 }
 
-/// Select the session to operate on. Uses `-s/--session` if supplied; otherwise
-/// the first ready session; otherwise the first session.
-fn select_session(
-    mgr: &SessionManager,
-    requested: Option<SessionId>,
-) -> Result<&crate::session::session::Session> {
-    if let Some(id) = requested {
-        return mgr
-            .get(id)
-            .ok_or_else(|| anyhow::anyhow!("session {id} not found"));
+/// Dispatch the DB-bound commands (everything that needs an open IDB).
+pub(crate) fn run_db_op(cli: &cli::Cli, idb: &mut IDB) -> Result<Out> {
+    match &cli.command {
+        Command::Segments(_) => Ok(Out::Segments(crate::ops::metadata::segments(idb))),
+        Command::SegmentsByRange(r) => match crate::ops::metadata::segment_at(idb, r.address) {
+            Some(s) => Ok(Out::Segment(s)),
+            None => Ok(Out::Null),
+        },
+        Command::Functions(f) => Ok(Out::Functions(crate::ops::metadata::functions(idb, f.user))),
+        Command::Function(f) => Ok(Out::FunctionDetail(crate::ops::metadata::function(
+            idb, f.address,
+        )?)),
+        Command::Disasm(d) => Ok(Out::Insns(crate::ops::metadata::disasm(
+            idb, d.address, d.count,
+        )?)),
+        Command::Decompile(d) => Ok(Out::Function(crate::ops::metadata::decompile(
+            idb,
+            d.address,
+            d.all_blocks,
+        )?)),
+        Command::Strings(s) => Ok(Out::Strings(crate::ops::metadata::strings(idb, s.all))),
+        Command::Names(_) => Ok(Out::Names(crate::ops::metadata::names(idb))),
+        Command::Xrefs(x) => Ok(Out::Xrefs(crate::ops::metadata::xrefs(
+            idb, x.address, x.all,
+        )?)),
+        Command::Entries(_) => Ok(Out::Entries(crate::ops::metadata::entries(idb))),
+        Command::Meta(_) => Ok(Out::Metadata(crate::ops::metadata::meta(idb))),
+        Command::Processor(_) => Ok(Out::Processor(crate::ops::metadata::processor(idb))),
+        Command::Insn(i) => Ok(Out::Insn(crate::ops::metadata::insn(idb, i.address)?)),
+        Command::Comments(c) => Ok(Out::Comment(crate::ops::comments::dispatch(idb, c)?)),
+        Command::Bookmarks(b) => Ok(Out::Bookmarks(crate::ops::bookmarks::dispatch(idb, b)?)),
+        Command::Signatures(s) => Ok(Out::Ok(crate::ops::signatures::dispatch(idb, s)?)),
+        _ => unreachable!("non-DB command reached run_db_op"),
     }
-    mgr.sessions
-        .iter()
-        .find(|(_, s)| s.state == SessionState::Ready)
-        .map(|(_, s)| s)
-        .or_else(|| mgr.sessions.iter().next().map(|(_, s)| s))
-        .ok_or_else(|| {
-            anyhow::anyhow!("no sessions; create one with `idalib-cli session open -b <file>`")
-        })
 }
 
-/// Open the target session's IDB from disk (or create it fresh), run the op,
-/// and close it (saving per the session's `save` setting). This is what makes
-/// sessions stateful across CLI invocations: the IDB file is the persisted state.
-fn with_idb<T, F>(mgr: &mut SessionManager, requested: Option<SessionId>, f: F) -> Result<T>
+/// Resolve `-d/--db` to (binary, idb) honouring the config default.
+pub fn resolve_target(cli: &cli::Cli) -> Result<(Option<PathBuf>, PathBuf, bool, bool)> {
+    let cfg = Config::load().unwrap_or_default();
+    let input = cli
+        .db
+        .clone()
+        .or_else(|| cfg.default_db.clone())
+        .ok_or_else(|| anyhow::anyhow!("missing -d/--db <PATH> (an IDB file or a binary)"))?;
+    let (binary, idb) = cli::resolve_db(&input);
+    Ok((
+        binary,
+        idb,
+        cfg.save.unwrap_or(true),
+        cfg.auto_analyse.unwrap_or(true),
+    ))
+}
+
+/// Open the target database, run the op, close (persisting state). Stateless:
+/// nothing is kept in memory or in a registry - the IDB file is the state.
+pub(crate) fn with_idb<T, F>(cli: &cli::Cli, f: F) -> Result<T>
 where
-    T: Serialize,
-    F: FnOnce(&mut crate::idalib::idb::IDB) -> Result<T>,
+    F: FnOnce(&mut IDB) -> Result<T>,
 {
-    let (id, binary, idb_path, auto_analyse, save) = {
-        let s = select_session(mgr, requested)?;
-        (
-            s.id,
-            s.config.binary.clone(),
-            s.config.idb.clone(),
-            s.config.auto_analyse,
-            s.config.save,
-        )
+    let (binary, idb_path, _save, auto_analyse) = resolve_target(cli)?;
+
+    let mut db = match binary {
+        Some(bin) => crate::ops::db::open_db(Some(&bin), &idb_path, auto_analyse, true)
+            .context("failed to open database")?,
+        None => IDB::open(&idb_path).context("failed to open database")?,
     };
-
-    let mut db = crate::ops::sessions::open_db(&binary, &idb_path, auto_analyse, save)
-        .context("failed to open session IDB")?;
     let result = f(&mut db);
-    // Save the database if the session is configured to persist changes.
-    db.save_on_close(save);
+    db.save_on_close(true);
     drop(db);
+    result
+}
 
-    let s = mgr.get_mut(id).unwrap();
-    match &result {
-        Ok(_) => {
-            s.state = SessionState::Ready;
-            s.error = None;
-        }
-        Err(e) => {
-            s.last_error = Some(format!("{e:#}"));
-        }
-    }
+/// Same as `with_idb` for closures returning `Result<()>` (used by batch).
+pub(crate) fn with_idb_ref<F>(cli: &cli::Cli, f: F) -> Result<()>
+where
+    F: FnOnce(&mut IDB) -> Result<()>,
+{
+    let (binary, idb_path, _save, auto_analyse) = resolve_target(cli)?;
+
+    let mut db = match binary {
+        Some(bin) => crate::ops::db::open_db(Some(&bin), &idb_path, auto_analyse, true)
+            .context("failed to open database")?,
+        None => IDB::open(&idb_path).context("failed to open database")?,
+    };
+    let result = f(&mut db);
+    db.save_on_close(true);
+    drop(db);
     result
 }
 
 pub fn print_out<T: Serialize>(v: &T) {
     println!("{}", serde_json::to_string_pretty(v).unwrap_or_default());
 }
+
+// re-export for op modules that need IDBOpenOptions
+#[allow(unused_imports)]
+use IDBOpenOptions as _;

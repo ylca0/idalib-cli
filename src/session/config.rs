@@ -18,6 +18,7 @@ use anyhow::Result;
 pub struct Config {
     pub idadir: Option<PathBuf>,
     pub idb_dir: Option<PathBuf>,
+    pub default_db: Option<PathBuf>,
     pub save: Option<bool>,
     pub auto_analyse: Option<bool>,
 }
@@ -34,7 +35,16 @@ impl Config {
 }
 
 pub fn config_path() -> Result<PathBuf> {
-    Ok(crate::session::storage::base_dir()?.join("config.toml"))
+    Ok(base_dir()?.join("config.toml"))
+}
+
+/// Runtime base directory: `$IDALIB_CLI_HOME` or `~/.idapro/idalib-cli`.
+pub fn base_dir() -> Result<PathBuf> {
+    if let Ok(dir) = std::env::var("IDALIB_CLI_HOME") {
+        return Ok(PathBuf::from(dir));
+    }
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    Ok(PathBuf::from(home).join(".idapro").join("idalib-cli"))
 }
 
 /// A tiny TOML subset parser sufficient for our config shape (no external dep).
@@ -59,6 +69,7 @@ fn parse_tomlish(raw: &str) -> Result<Config> {
             match k {
                 "idadir" => cfg.idadir = Some(expand_tilde(v).into()),
                 "idb_dir" => cfg.idb_dir = Some(expand_tilde(v).into()),
+                "default_db" => cfg.default_db = Some(expand_tilde(v).into()),
                 "save" => cfg.save = Some(v.eq_ignore_ascii_case("true")),
                 "auto_analyse" => cfg.auto_analyse = Some(v.eq_ignore_ascii_case("true")),
                 _ => {}

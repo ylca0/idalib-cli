@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use clap::{Args, Parser, Subcommand};
@@ -11,45 +11,46 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
     version = VERSION,
     about = "Agent-native CLI for the IDA Pro IDALib (v9.1) via idalib-rs",
     long_about = "A single-binary, agent-first command line interface to the IDA Pro IDALib.\n\n\
-        Sessions: each session is an independent, stateful IDA/IDALib analysis process with\n\
-        its own IDB state.  Sessions can be opened, inspected and closed independently, and\n\
-        many sessions can be analysed in parallel across multiple processes/agents.\n\n\
-        Output: every command emits structured JSON on stdout by default, which makes the\n\
-        tool directly usable by code agents (Codex, Claude Code, OpenCode, ...).  Use\n\
-        --json/--raw for machine consumption, or plain human-readable text otherwise."
+        Stateless: every command takes `-d/--db <PATH>` pointing at either an IDB\n\
+        file (.i64) or a binary (an IDB is created next to it on first use). All\n\
+        state lives in the IDB file itself - comments, bookmarks, names and\n\
+        analysis results persist across invocations.\n\n\
+        Output: every command emits a JSON document on stdout; errors go to\n\
+        stderr with a non-zero exit code."
 )]
 #[command(after_help = "EXAMPLES:\n\
-    # create + open + analyse a binary in one go\n\
-    idalib-cli session open -b ./target.bin\n\n\
-    # list sessions\n\
-    idalib-cli session list\n\n\
-    # decompile a function inside session 1\n\
-    idalib-cli decompile -s 1 -a 0x401000\n\n\
-    # dump all functions as JSON (machine readable)\n\
-    idalib-cli funcs -s 1 --json\n")]
+    # analyse a binary (IDB created next to it on first use)\n\
+    idalib-cli -d ./target.bin functions\n\n\
+    # reopen an existing IDB\n\
+    idalib-cli -d ./target.i64 decompile -a 0x401000\n\n\
+    # several commands in one process (IDB opened once)\n\
+    idalib-cli -d ./target.bin batch -- \"meta\" \"segments\" \"functions -u\"\n\n\
+    # same command across many IDBs concurrently (one subprocess each)\n\
+    idalib-cli parallel -d \"./a.i64,./b.i64\" -- \"functions -u\"\n")]
 pub struct Cli {
-    /// Emit machine-readable JSON instead of human text
+    /// Database to operate on: an IDB file (.i64) or a binary (IDB created
+    /// next to it if absent). Required by every command.
+    #[arg(short = 'd', long = "db", global = true, value_name = "PATH")]
+    pub db: Option<PathBuf>,
+
+    /// Emit machine-readable JSON (JSON is already the default)
     #[arg(short = 'j', long, global = true)]
     pub json: bool,
 
-    /// Session to operate on (for commands that need a database). If omitted,
-    /// the first ready session is used.
-    #[arg(short = 's', long, global = true, value_name = "SESSION")]
-    pub session: Option<SessionId>,
-
-    /// Run several commands in a single invocation (session is optional for all)
     #[command(subcommand)]
     pub command: Command,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Query and initialise the IDA/IDALib runtime
+    /// Runtime, version and license information
     Info(InfoCmd),
-    /// Manage analysis sessions (each is an independent stateful IDA process)
-    Session(SessionCmd),
-    /// Dump low-level database details
+    /// Database management: open (create IDB), info, close, remove
+    Db(DbCmd),
+    /// List all segments in the database
     Segments(SegmentsCmd),
+    /// Find the segment containing an address
+    SegmentsByRange(SegmentsByRangeCmd),
     /// List all functions
     Functions(FunctionsCmd),
     /// Show detailed info about one function (CFG, blocks, xrefs)
@@ -70,8 +71,6 @@ pub enum Command {
     Meta(MetaCmd),
     /// Show processor information
     Processor(ProcessorCmd),
-    /// Find the segment containing an address
-    SegmentsByRange(SegmentsByRangeCmd),
     /// Show one instruction at an address
     Insn(InsnCmd),
     /// Read/write comments in the database
@@ -80,47 +79,10 @@ pub enum Command {
     Bookmarks(BookmarksCmd),
     /// Generate FLIRT signature files from the database
     Signatures(SignaturesCmd),
-    /// Run several sub-commands in sequence against one session
+    /// Run several sub-commands in sequence against one database
     Batch(BatchCmd),
-    /// Run a sub-command across many sessions in parallel (one process each)
+    /// Run a sub-command across many databases in parallel (one process each)
     Parallel(ParallelCmd),
-}
-
-/// Run a command against a set of sessions concurrently. Each session is
-/// handled by its own subprocess (`idalib-cli <op> -s <id>`), so independent
-/// IDB files are analysed in parallel across multiple processes/agents.
-#[derive(Args, Debug)]
-pub struct ParallelCmd {
-    /// The command to run against each session (e.g. "decompile -a 0x401000").
-    /// Wrap the whole op in quotes; flags inside it are passed through verbatim.
-    #[arg(required = true, value_name = "OP", allow_hyphen_values = true)]
-    pub op: String,
-
-    /// Sessions to target (repeatable; default: all sessions)
-    #[arg(short = 'S', long = "sessions", value_delimiter = ',')]
-    pub sessions: Vec<SessionId>,
-
-    /// Maximum number of concurrent workers (default: number of CPUs)
-    #[arg(long = "jobs", default_value_t = 0)]
-    pub jobs: usize,
-
-    /// Path to this executable (defaults to the running binary)
-    #[arg(long, value_name = "PATH")]
-    pub bin: Option<std::path::PathBuf>,
-}
-
-/// Run a sequence of commands against a single session in one invocation.
-#[derive(Args, Debug)]
-pub struct BatchCmd {
-    /// The commands to run, each as a full command-line (e.g. "functions -u",
-    /// "decompile -a 0x401000"). Commands are executed in order; the last one's
-    /// output is emitted on stdout (all outputs are available in `--json` mode).
-    #[arg(required = true, value_name = "OP", trailing_var_arg = true)]
-    pub ops: Vec<String>,
-
-    /// Session to operate on (defaults to first ready session)
-    #[arg(short = 's', long)]
-    pub session: Option<SessionId>,
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +91,7 @@ pub struct BatchCmd {
 
 #[derive(Args, Debug)]
 pub struct InfoCmd {
-    /// Show version information
+    /// Show IDA version
     #[arg(long)]
     pub version: bool,
     /// Show IDA installation/licence information
@@ -141,97 +103,57 @@ pub struct InfoCmd {
 }
 
 // ---------------------------------------------------------------------------
-// session
+// db
 // ---------------------------------------------------------------------------
 
 #[derive(Args, Debug)]
-pub struct SessionCmd {
+pub struct DbCmd {
     #[command(subcommand)]
-    pub command: SessionAction,
+    pub command: DbAction,
 }
 
 #[derive(Subcommand, Debug)]
-pub enum SessionAction {
-    /// Create a new session (IDB is opened immediately)
-    Open(SessionOpenCmd),
-    /// List all sessions
-    List(SessionListCmd),
-    /// Show details for one session
-    Show(SessionShowCmd),
-    /// Close (and optionally save) a session, releasing its IDB
-    Close(SessionCloseCmd),
-    /// Destroy a session (remove it from the registry)
-    Remove(SessionRemoveCmd),
-    /// Save the IDB of a session
-    Save(SessionSaveCmd),
-    /// Run an analysis (auto-wait) on a session
-    Analyze(SessionAnalyzeCmd),
+pub enum DbAction {
+    /// Open (or create) the IDB for a binary; runs auto-analysis
+    Open(DbOpenCmd),
+    /// Show details about a database (paths, IDB state)
+    Info(DbInfoCmd),
+    /// Close the database (flush pending state; state already saved per-op)
+    Close(DbCloseCmd),
+    /// Remove the IDB file (and .id0/.id1/... siblings if any)
+    Remove(DbRemoveCmd),
 }
 
 #[derive(Args, Debug)]
-pub struct SessionOpenCmd {
-    /// Path to the input binary
-    #[arg(short = 'b', long, required = true)]
-    pub binary: PathBuf,
-    /// Path where the IDB will be stored (defaults to <binary>.i64)
-    #[arg(short = 'o', long)]
-    pub idb: Option<PathBuf>,
-    /// Optional name for the session
-    #[arg(short = 'n', long)]
-    pub name: Option<String>,
-    /// Run full auto-analysis (default: on)
-    #[arg(short = 'a', long, default_value_t = true, action = clap::ArgAction::Set)]
-    pub auto_analyse: bool,
-    /// Save IDB on close (default: on)
+pub struct DbOpenCmd {
+    /// Path to the IDB file or the input binary
+    #[arg(short = 'd', long = "db", value_name = "PATH")]
+    pub db: Option<PathBuf>,
+    /// Save the IDB on close (default: on)
     #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
     pub save: bool,
-    /// Enable IDA console messages (may be noisy)
-    #[arg(short = 'v', long)]
-    pub verbose: bool,
+    /// Run full auto-analysis (default: on)
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    pub auto_analyse: bool,
 }
 
 #[derive(Args, Debug)]
-pub struct SessionListCmd {}
-
-#[derive(Args, Debug)]
-pub struct SessionShowCmd {
-    /// Session id (falls back to the global --session or the first ready session)
-    #[arg(short = 's', long)]
-    pub session: Option<SessionId>,
+pub struct DbInfoCmd {
+    #[arg(short = 'd', long = "db", value_name = "PATH")]
+    pub db: Option<PathBuf>,
 }
 
 #[derive(Args, Debug)]
-pub struct SessionCloseCmd {
-    /// Session id (falls back to the global --session or the first ready session)
-    #[arg(short = 's', long)]
-    pub session: Option<SessionId>,
-    /// Save the IDB before closing (default: session's configured value)
-    #[arg(long)]
-    pub save: Option<bool>,
+pub struct DbCloseCmd {
+    #[arg(short = 'd', long = "db", value_name = "PATH")]
+    pub db: Option<PathBuf>,
 }
 
 #[derive(Args, Debug)]
-pub struct SessionRemoveCmd {
-    /// Session id (falls back to the global --session or the first ready session)
-    #[arg(short = 's', long)]
-    pub session: Option<SessionId>,
-}
-
-#[derive(Args, Debug)]
-pub struct SessionSaveCmd {
-    /// Session id (falls back to the global --session or the first ready session)
-    #[arg(short = 's', long)]
-    pub session: Option<SessionId>,
-}
-
-#[derive(Args, Debug)]
-pub struct SessionAnalyzeCmd {
-    /// Session id (falls back to the global --session or the first ready session)
-    #[arg(short = 's', long)]
-    pub session: Option<SessionId>,
-    /// Wait until auto-analysis completes (default: on)
-    #[arg(long, default_value_t = true)]
-    pub wait: bool,
+pub struct DbRemoveCmd {
+    /// Database to delete (the .i64 file, or a binary with its sibling IDB)
+    #[arg(short = 'd', long = "db", value_name = "PATH")]
+    pub db: Option<PathBuf>,
 }
 
 // ---------------------------------------------------------------------------
@@ -286,9 +208,6 @@ pub struct StringsCmd {
     /// Also show hidden strings
     #[arg(long)]
     pub all: bool,
-    /// Show string addresses too (in text mode)
-    #[arg(long)]
-    pub addresses: bool,
 }
 
 #[derive(Args, Debug)]
@@ -418,16 +337,46 @@ pub struct SignaturesCmd {
     /// Only analyse patterns (no full analysis)
     #[arg(long)]
     pub only_pat: bool,
-    /// Path to store generated signatures (optional; must be a directory)
-    #[arg(short = 'o', long)]
-    pub output: Option<PathBuf>,
+}
+
+// ---------------------------------------------------------------------------
+// batch / parallel
+// ---------------------------------------------------------------------------
+
+/// Run a sequence of commands against one database in a single invocation.
+#[derive(Args, Debug)]
+pub struct BatchCmd {
+    /// The commands to run, each as a full command-line without the global
+    /// -d flag (e.g. "functions -u", "decompile -a 0x401000")
+    #[arg(required = true, value_name = "OP", trailing_var_arg = true)]
+    pub ops: Vec<String>,
+}
+
+/// Run a command against a set of databases concurrently. Each database is
+/// handled by its own subprocess (`idalib-cli -d <db> <op>`).
+#[derive(Args, Debug)]
+pub struct ParallelCmd {
+    /// The command to run against each database (e.g. "decompile -a 0x401000")
+    #[arg(required = true, value_name = "OP", allow_hyphen_values = true)]
+    pub op: String,
+
+    /// Databases to target: an IDB or binary path; also accepts a comma-
+    /// separated list or a glob (default: none => required)
+    #[arg(short = 'd', long = "db", required = true, value_name = "SPEC")]
+    pub dbs: String,
+
+    /// Maximum number of concurrent workers (default: number of CPUs)
+    #[arg(long = "jobs", default_value_t = 0)]
+    pub jobs: usize,
+
+    /// Path to this executable (defaults to the running binary)
+    #[arg(long, value_name = "PATH")]
+    pub bin: Option<PathBuf>,
 }
 
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
-
-pub type SessionId = u32;
 
 pub fn parse_hex(s: &str) -> Result<u64, String> {
     let t = s.trim();
@@ -445,4 +394,37 @@ pub fn parse_duration(s: &str) -> Result<Duration, String> {
     s.parse::<u64>()
         .map(Duration::from_secs)
         .map_err(|e| format!("invalid duration '{s}': {e}"))
+}
+
+/// Resolve a `-d/--db` value to (binary, idb) paths. If the path is an IDB
+/// (.i64), the binary path is unknown (None) - reopening uses the IDB itself.
+/// If it is a binary, the IDB path is `<binary>.i64` next to it (honouring
+/// the configured `idb_dir`).
+pub fn resolve_db(db: &Path) -> (Option<PathBuf>, PathBuf) {
+    let ext = db.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if ext == "i64" || ext == "idb" {
+        (None, db.to_path_buf())
+    } else {
+        (Some(db.to_path_buf()), default_idb_path(db))
+    }
+}
+
+/// Default IDB path for a binary: next to it, `<binary>.i64`. An explicit
+/// `idb_dir` in the config overrides the directory.
+pub fn default_idb_path(binary: &Path) -> PathBuf {
+    let file_name = binary
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "binary".to_string());
+    let name = format!("{file_name}.i64");
+
+    if let Ok(cfg) = crate::session::config::Config::load() {
+        if let Some(dir) = cfg.idb_dir {
+            return dir.join(name);
+        }
+    }
+    match binary.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir.join(name),
+        _ => PathBuf::from(name),
+    }
 }

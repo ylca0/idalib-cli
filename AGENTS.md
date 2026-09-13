@@ -33,10 +33,12 @@ cargo build --release
 - All commands output JSON by default; `--json` is a legacy/consistency flag.
 - `stubs/idalib` is a DEV-ONLY API stub for `idalib`. It must never be compiled
   into release builds (it is gated behind the `stub-idalib` feature).
+- Stateless interface: every command takes `-d/--db <PATH>` (an IDB file or a
+  binary). There is no session registry - the IDB file is the only state.
 - When adding a new IDALib capability, mirror the shape in `src/ops/metadata.rs`
   (or a new op file), add a clap variant in `src/cli.rs`, dispatch it in
-  `src/ops/top.rs`, and extend the stub `stubs/idalib/src/*.rs` so code still
-  type-checks without the SDK.
+  `src/ops/top.rs` (`run_db_op`), and extend the stub `stubs/idalib/src/*.rs`
+  so code still type-checks without the SDK.
 
 ## Testing
 

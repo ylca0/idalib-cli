@@ -1,21 +1,23 @@
 <div align="center">
 
-# idalib-cli
+# <img src="assets/icon.svg" width="40" valign="middle" alt="idalib-cli logo"/> idalib-cli
 
 **面向 IDA Pro IDALib 的 Agent 原生 CLI — 基于 [idalib-rs](https://github.com/idalib-rs/idalib)**
 
 [![IDA](https://img.shields.io/badge/IDA_Pro-9.1-blue)](https://hex-rays.com/ida-pro)
 [![idalib-rs](https://img.shields.io/badge/idalib--rs-0.6.1-orange)](https://github.com/idalib-rs/idalib)
 [![Version](https://img.shields.io/badge/version-0.9.1-green)](#版本与分支)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-lightgrey)](#许可证)
+[![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](#许可证)
 
 [English](README.md) · **简体中文**
 
 </div>
 
-单一可执行文件的命令行工具，把 IDA 分析能力以结构化 JSON 的形式暴露出来 —
-专为代码 Agent（Codex、Claude Code、OpenCode）或人类用户设计。管理多个独立、
-有状态的分析会话（Session），每个会话持有独立的 IDB，并支持多进程并发分析。
+单一可执行文件的**无状态**命令行工具，把 IDA 分析能力以结构化 JSON 的形式
+暴露出来 — 专为代码 Agent（Codex、Claude Code、OpenCode）或人类用户设计。
+每条命令都用 `-d/--db <路径>` 指定目标：一个 IDB 文件（`.i64`）或一个二进制
+（首次使用时会在其旁自动生成 IDB）。所有状态都在 IDB 文件里 — 注释、书签、
+命名、分析结果跨调用保留；多个数据库可跨进程并发分析。
 
 ---
 
@@ -23,11 +25,11 @@
 
 | | |
 | --- | --- |
-| 💾 **多会话管理** | 独立且有状态的分析会话；注册表持久化在 `~/.idapro/idalib-cli/sessions.json` |
-| 🗄️ **IDB 状态持久** | 每个会话对应一个 `.i64` 文件 — 注释、书签、命名、分析结果跨进程保留 |
+| 💾 **无状态** | 每条命令带 `-d/--db <路径>` — 无守护进程、无注册表、无会话簿记 |
+| 🗄️ **IDB 状态持久** | IDB 文件本身就是状态 — 注释、书签、命名、分析结果跨进程保留 |
 | 🧩 **全量 IDALib 覆盖** | 段、函数、CFG、反汇编、Hex-Rays 反编译、字符串、命名、交叉引用、入口点、元数据、注释、书签、FLIRT 签名 |
-| ⚡ **批量与并发** | `batch` = 单进程顺序执行多条命令；`parallel` = 一条命令扇出到多个会话 |
-| 🤖 **Agent 优先** | 所有命令输出 JSON；全局 `-s/--session` 选会话；内置 Agent Skills |
+| ⚡ **批量与并发** | `batch` = 多条命令只开一次 IDB；`parallel` = 一条命令扇出到多个数据库（支持列表/glob） |
+| 🤖 **Agent 优先** | 所有命令输出 JSON；统一的 `-d` 参数；内置 Agent Skills |
 
 ## 安装
 
@@ -65,29 +67,26 @@ idalib-cli info    # ✅ 验证：工具版本、IDA 版本、许可证
 ## 快速开始
 
 ```sh
-idalib-cli session open -b ./target.bin -o ./target.i64   # 1. 创建会话
-idalib-cli batch -- "meta" "segments" "strings" "functions -u"   # 2. 概览
-idalib-cli decompile -s 1 -a 0x401000                     # 3. Hex-Rays 伪代码
-idalib-cli comments set -s 1 -a 0x401000 -c "note"        # 4. 标注（持久化）
-idalib-cli parallel -- "decompile -a 0x401000"            # 5. 扇出到全部会话
+idalib-cli -d ./target.bin functions                      # 1. 分析（自动建 IDB）
+idalib-cli -d ./target.bin batch -- "meta" "segments" "strings" "functions -u"   # 2. 概览
+idalib-cli -d ./target.i64 decompile -a 0x401000          # 3. Hex-Rays 伪代码
+idalib-cli -d ./target.bin comments set -a 0x401000 -c "note"    # 4. 标注（持久化）
+idalib-cli parallel -d "./a.i64,./b.i64" -- "functions -u"       # 5. 扇出到多个库
 ```
 
 ## 命令参考
 
-> 全局选项：`-s/--session <ID>` 选会话（省略时用第一个 ready 会话）·
+> 全局选项：`-d/--db <路径>` 指定数据库（`.i64` 或二进制）— 所有命令必需 ·
 > `-j/--json` 强制 JSON（默认即 JSON）· 地址接受 `0x401000` 或 `401000`
 
 <details>
-<summary><b>会话管理</b></summary>
+<summary><b>数据库管理</b></summary>
 
 ```sh
-idalib-cli session open    -b <bin> [-o <idb>] [-n name] [--save] [--auto-analyse]
-idalib-cli session list
-idalib-cli session show    -s <id>
-idalib-cli session close   -s <id> [--save true|false]
-idalib-cli session save    -s <id>
-idalib-cli session analyze -s <id> [--wait]
-idalib-cli session remove  -s <id>
+idalib-cli -d <bin-or-i64> db info      # 路径、IDB 状态、大小
+idalib-cli -d <bin-or-i64> db close     # 刷盘（每条命令本就落盘）
+idalib-cli db remove -d <bin-or-i64>    # 删除 IDB（绝不删二进制）
+idalib-cli -d <bin> db open [--save/--auto-analyse]   # 显式打开 + 分析
 ```
 
 </details>
@@ -126,12 +125,12 @@ idalib-cli signatures --make [--only-pat]      # 生成 FLIRT 签名
 <summary><b>批量与并发</b></summary>
 
 ```sh
-# 顺序执行，单进程，单会话
-idalib-cli batch -- "meta" "segments" "decompile -a 0x401000"
+# 顺序执行，单进程，IDB 只开一次
+idalib-cli -d ./target.bin batch -- "meta" "segments" "decompile -a 0x401000"
 
-# 一条命令，多个会话（每个会话一个子进程）
-idalib-cli parallel -- "functions -u"           # 全部会话
-idalib-cli parallel -S 1,2,3 --jobs 4 -- "strings"
+# 一条命令，多个数据库（每个库一个子进程）；支持逗号列表或 glob
+idalib-cli parallel -d "./a.i64,./b.i64" -- "functions -u"
+idalib-cli parallel -d "./samples/*.i64" --jobs 4 -- "strings"
 ```
 
 </details>
@@ -166,20 +165,21 @@ idalib-cli parallel -S 1,2,3 --jobs 4 -- "strings"
 [defaults]
 idadir = "/Applications/IDA Professional 9.1.app/Contents/MacOS"
 idb_dir = "~/ida_out"      # IDB 默认存放位置（否则放在二进制同目录）
+default_db = "~/idbs/main.i64"   # 省略 -d 时使用
 save = true
 auto_analyse = true
 ```
 
-未显式给 `-o` 时，IDB 默认生成在被分析二进制的同目录（`<binary>.i64`）。
+未显式给 `-d` 指向 IDB 时，IDB 默认生成在被分析二进制的同目录（`<binary>.i64`）。
 
 ## 架构说明
 
-执行流：**加载配置 → 恢复会话注册表 → 执行命令（从磁盘打开 IDB → 查询 →
-保存）→ 持久化注册表**。
+执行流：**加载配置 → 解析 `-d/--db` → 从磁盘打开 IDB（不存在则在二进制旁
+创建）→ 执行命令 → 保存 → 退出**。
 
-- **会话** = 一个二进制 + 一个 IDB 文件 + 一条注册表记录。IDB 文件是状态的
-  唯一权威 → 会话天然独立、跨调用持久、可安全并发。
-- `parallel` 以进程为隔离单位（每个会话一个子进程）— IDALib 不支持同进程
+- **无状态**：无守护进程、无注册表、无会话记录。IDB 文件是状态的唯一权威，
+  因此各数据库天然独立、跨调用持久、可安全并发。
+- `parallel` 以进程为隔离单位（每个数据库一个子进程）— IDALib 不支持同进程
   多线程并发操作数据库。
 - 输出契约：stdout 输出一个 JSON 文档；错误走 stderr，退出码非零。
 - 已内置的上游问题规避：`EntryPointIter` 死循环修复（0.6.1）、字符串 NUL
@@ -207,4 +207,6 @@ v0.9.1 tag       发布点
 
 ## 许可证
 
-MIT OR Apache-2.0，与 [idalib-rs](https://github.com/idalib-rs/idalib) 一致。
+本项目以 [Apache License 2.0](LICENSE) 分发。`Cargo.toml` 中的 `license` 字段
+声明为 `MIT OR Apache-2.0`，以保持与 [idalib-rs](https://github.com/idalib-rs/idalib)
+依赖的兼容；本仓库仅附带 Apache-2.0 许可文本。
