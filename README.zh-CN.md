@@ -46,10 +46,7 @@ idalib-cli info    # ✅ 验证工具版本、IDA 版本、许可证
 
 | 命令 | 说明 |
 |---|---|
-| `idalib-cli -d <bin> db info` | 路径、IDB 状态、大小 |
-| `idalib-cli -d <bin> db open [--save] [--auto-analyse]` | 显式打开/创建并分析 |
-| `idalib-cli -d <bin> db close` | 刷盘 |
-| `idalib-cli db remove -d <bin-or-i64>` | 删除 IDB（绝不删二进制） |
+| `idalib-cli -d <bin-or-i64> db info` | 解析后的路径、IDB 状态、大小 |
 
 ### 查询
 

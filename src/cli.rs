@@ -45,7 +45,7 @@ pub struct Cli {
 pub enum Command {
     /// Runtime, version and license information
     Info(InfoCmd),
-    /// Database management: open (create IDB), info, close, remove
+    /// Database management: show info about the resolved IDB
     Db(DbCmd),
     /// List all segments in the database
     Segments(SegmentsCmd),
@@ -114,44 +114,12 @@ pub struct DbCmd {
 
 #[derive(Subcommand, Debug)]
 pub enum DbAction {
-    /// Open (or create) the IDB for a binary; runs auto-analysis
-    Open(DbOpenCmd),
-    /// Show details about a database (paths, IDB state)
+    /// Show details about the resolved database (paths, IDB state, size)
     Info(DbInfoCmd),
-    /// Close the database (flush pending state; state already saved per-op)
-    Close(DbCloseCmd),
-    /// Remove the IDB file (and .id0/.id1/... siblings if any)
-    Remove(DbRemoveCmd),
-}
-
-#[derive(Args, Debug)]
-pub struct DbOpenCmd {
-    /// Path to the IDB file or the input binary
-    #[arg(short = 'd', long = "db", value_name = "PATH")]
-    pub db: Option<PathBuf>,
-    /// Save the IDB on close (default: on)
-    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
-    pub save: bool,
-    /// Run full auto-analysis (default: on)
-    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
-    pub auto_analyse: bool,
 }
 
 #[derive(Args, Debug)]
 pub struct DbInfoCmd {
-    #[arg(short = 'd', long = "db", value_name = "PATH")]
-    pub db: Option<PathBuf>,
-}
-
-#[derive(Args, Debug)]
-pub struct DbCloseCmd {
-    #[arg(short = 'd', long = "db", value_name = "PATH")]
-    pub db: Option<PathBuf>,
-}
-
-#[derive(Args, Debug)]
-pub struct DbRemoveCmd {
-    /// Database to delete (the .i64 file, or a binary with its sibling IDB)
     #[arg(short = 'd', long = "db", value_name = "PATH")]
     pub db: Option<PathBuf>,
 }
