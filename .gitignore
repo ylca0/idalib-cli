@@ -1,15 +1,14 @@
 # --- Rust / Cargo ---
 /target
 **/*.rs.bk
-Cargo.lock.bak
 
-# --- IDA SDK (must NEVER be committed: Hex-Rays license forbids redistribution.
-# For CI, store an encrypted archive + password in GitHub Secrets.) ---
+# --- IDA SDK (never commit: plaintext SDK + any archives) ---
 /idasdk*/
 idasdk*.zip
+idasdk*-enc.zip
 
 # --- Runtime state (sessions registry, config, temp IDBs) ---
-# Created wherever IDALIB_CLI_HOME points; default is ~/.idapro/idalib-cli
+# Default base is ~/.idapro/idalib-cli (override with IDALIB_CLI_HOME)
 /.idapro/
 *.i64
 *.idb
@@ -30,13 +29,9 @@ idasdk*.zip
 *.swp
 *.swo
 *~
-.DS_Store
 
-# --- Environment / secrets ---
+# --- OS / env ---
+.DS_Store
 .env
 .env.*
-*.local
-
-# --- Coverage / profiling ---
-*.profraw
-*.profdata
+/examples/
