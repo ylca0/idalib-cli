@@ -1,2 +1,37 @@
+# --- Rust / Cargo ---
 /target
+**/*.rs.bk
+
+# --- IDA SDK (never commit: plaintext SDK + any archives) ---
+/idasdk*/
+idasdk*.zip
+idasdk*-enc.zip
+
+# --- Runtime state (sessions registry, config, temp IDBs) ---
+# Default base is ~/.idapro/idalib-cli (override with IDALIB_CLI_HOME)
+/.idapro/
+*.i64
+*.idb
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+
+# --- IDA generated files ---
+*.asm
+*.lst
+*.map
+
+# --- IDE / editors ---
 /.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS / env ---
+.DS_Store
+.env
+.env.*
+/examples/

@@ -1,6 +1,54 @@
 [package]
 name = "idalib-cli"
-version = "0.1.0"
+version = "0.9.1"
 edition = "2024"
+rust-version = "1.85"
+description = "Agent-native, multi-session CLI for IDA Pro IDALib (IDA 9.1 via idalib-rs 0.6.1)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/idalib-rs/idalib"
+readme = "README.md"
+keywords = ["reverse-engineering", "ida", "idalib", "analysis", "agent"]
+categories = ["command-line-utilities", "development-tools", "security"]
+
+[package.metadata.ida]
+compatible = "9.1"
+idalib-rs = "=0.6.1"
+
+[lib]
+name = "idalib_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "idalib-cli"
+path = "src/main.rs"
 
 [dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "wrap_help", "env"] }
+num_cpus = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+default = ["real-idalib"]
+# Real build against idalib-rs 0.6.1 (requires the IDA 9.1 SDK via IDASDKDIR).
+real-idalib = ["dep:idalib"]
+# Dev-only: use a local stub of `idalib` so the rest of the codebase can be
+# typechecked and tested without the IDA SDK installed. Never enable in
+# release/production builds. Usage:
+#   cargo check --no-default-features --features stub-idalib
+stub-idalib = ["dep:idalib-stub"]
+
+[dependencies.idalib]
+version = "=0.6.1"
+default-features = false
+optional = true
+
+[dependencies.idalib-stub]
+package = "idalib"
+path = "stubs/idalib"
+version = "0.6.1"
+optional = true
+
+[build-dependencies]
+idalib-build = "0.6"
