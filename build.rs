@@ -12,7 +12,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ---- Hard prerequisite 1: IDA SDK (build-time, for bindgen) ----
     let sdk_dir = match std::env::var("IDASDKDIR") {
-        Ok(d) => PathBuf::from(d),
+        Ok(d) => {
+            let p = PathBuf::from(d);
+            // Relative paths break inside the build script: cargo compiles
+            // build scripts with a different CWD (the package dir, not the
+            // user's shell CWD), and autocxx/clang then can't find headers.
+            // Relative paths DO NOT WORK: cargo runs each build script with
+            // its own package dir as CWD, so `idalib-sys` (a dependency)
+            // resolves ./xxx against ~/.cargo/registry/... and fails with a
+            // cryptic "auto.hpp not found". Catch it here with actionable
+            // guidance instead.
+            if !p.is_absolute() {
+                let abs = std::env::current_dir().expect("current dir").join(&p);
+                let p_display = p.display();
+                let abs_display = abs.display();
+                eprintln!(
+                    "\n\
+                     ============================================================\n\
+                     \x20 IDASDKDIR must be an ABSOLUTE path.\n\
+                     ============================================================\n\
+                     \n\
+                     Got: {p_display}\n\
+                     Relative paths are resolved by dependency build scripts\n\
+                     against their own package directory, not your shell.\n\
+                     \n\
+                     Fix (copy-paste):\n\
+                     \n\
+                       export IDASDKDIR={abs_display}\n"
+                );
+                std::process::exit(1);
+            }
+            p
+        }
         Err(_) => {
             eprintln!(
                 "\n\
