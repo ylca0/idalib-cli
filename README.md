@@ -1,144 +1,138 @@
 <div align="center">
 
-# <img src="assets/icon.svg" width="40" valign="middle" alt="idalib-cli logo"/> idalib-cli
+# <img src="assets/icon.svg" width="72" valign="middle" alt="idalib-cli"/>️ idalib-cli
 
-**Agent-native CLI for the IDA Pro IDALib — built on [idalib-rs](https://github.com/idalib-rs/idalib)**
+**Agent-native CLI for the IDA Pro IDALib** — every command takes one `-d/--db` flag, every answer is JSON.
 
-[![IDA](https://img.shields.io/badge/IDA_Pro-9.1-blue)](https://hex-rays.com/ida-pro)
-[![idalib-rs](https://img.shields.io/badge/idalib--rs-0.6.1-orange)](https://github.com/idalib-rs/idalib)
-[![Version](https://img.shields.io/badge/version-0.9.1-green)](#versions--branches)
-[![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](#license)
+**[English](README.md)** · **[中文](README.zh-CN.md)**
 
-**English** · [简体中文](README.zh-CN.md)
+![IDA Pro 9.1](https://img.shields.io/badge/IDA_Pro-9.1-blue) ![idalib-rs 0.6.1](https://img.shields.io/badge/idalib--rs-0.6.1-orange) ![v0.9.1](https://img.shields.io/badge/version-0.9.1-green) ![Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-lightgrey)
 
 </div>
 
-A single-binary, **stateless** CLI that exposes IDA analysis as structured
-JSON — designed to be driven by code agents (Codex, Claude Code, OpenCode) or
-humans. Every command takes `-d/--db <PATH>`: an IDB file (`.i64`) or a binary
-(an IDB is created next to it on first use). All state lives in the IDB file —
-comments, bookmarks, names and analysis survive across invocations, and many
-databases can be processed concurrently across processes.
-
 ---
 
-## Features
+## ✨ Features
 
-| | |
-| --- | --- |
-| 💾 **Stateless** | `-d/--db <PATH>` on every command — no daemon, no registry, no session bookkeeping |
-| 🗄️ **Persistent IDB** | The IDB file *is* the state — comments, bookmarks, names, analysis survive across processes |
-| 🧩 **Full IDALib coverage** | Segments, functions, CFG, disassembly, Hex-Rays, strings, names, xrefs, entries, metadata, comments, bookmarks, FLIRT |
-| ⚡ **Batch & parallel** | `batch` = several commands, IDB opened once; `parallel` = one command fanned out to many databases (glob/list supported) |
-| 🤖 **Agent-first** | JSON on stdout everywhere; one uniform `-d` flag; skills included for agents |
+- 🗄️ **Stateless** — pass `-d/--db <PATH>` (a binary or an `.i64`); no daemon, no session bookkeeping.
+- 💾 **Persistent IDB state** — the IDB file *is* the state: comments, bookmarks, names and analysis survive across processes.
+- 🧩 **Full IDALib coverage** — segments, functions, CFG, disassembly, Hex-Rays decompilation, strings, names, xrefs, entries, metadata, comments, bookmarks, FLIRT signatures.
+- ⚡ **batch & parallel** — run many commands with one IDB open; fan a command out to many databases concurrently (glob supported).
+- 🤖 **Agent-first** — one JSON document on stdout, errors on stderr; skills included for Codex / Claude Code / OpenCode.
 
-## Install
+## 🚀 Install
 
-> **Prerequisites**
-> 1. IDA Pro 9.1 installed & launched once (valid license)
-> 2. IDA 9.1 SDK unpacked (from your Hex-Rays account) — **build time only**
-> 3. Rust toolchain + LLVM/Clang ([bindgen requirements](https://rust-lang.github.io/rust-bindgen/requirements.html))
+> **Prerequisites**: IDA Pro 9.1 (licensed, launched once) · IDA 9.1 SDK unpacked (build time only) · Rust + LLVM/Clang ([bindgen requirements](https://rust-lang.github.io/rust-bindgen/requirements.html))
 
-```sh
+```bash
 export IDADIR="/Applications/IDA Professional 9.1.app/Contents/MacOS"  # IDA install dir
 export IDASDKDIR=$HOME/idasdk91                                        # unpacked SDK
 
 git clone <this-repo> && cd idalib-cli
 cargo install --path .
 
-idalib-cli info    # ✅ verify: tool version, IDA version, license
+idalib-cli info    # ✅ verify tool version, IDA version, license
 ```
 
-<details>
-<summary>Notes & dev checks without an SDK</summary>
+> The SDK is needed **at build time only**; the binary links your local IDA libraries at runtime. Dev checks without an SDK: `cargo test --no-default-features --features stub-idalib`.
 
-- `IDADIR` is auto-detected from common locations if unset.
-- The binary links your local `libida`/`libidalib` at runtime; the SDK is
-  never embedded or redistributed.
-- Code-level checks without an SDK (dev only):
+## 🎮 Commands & usage
 
-  ```sh
-  cargo check --no-default-features --features stub-idalib
-  cargo test  --no-default-features --features stub-idalib
-  cargo fmt --all --check
-  ```
+Every command needs `-d/--db <PATH>` — an IDB file (`.i64`) or a binary (an
+IDB is created next to it on first use). Addresses accept `0x401000` or
+`401000`. Output is always one JSON document; errors go to stderr with a
+non-zero exit code.
 
-</details>
+### Database
 
-## Quick start
+| Command | Description |
+|---|---|
+| `idalib-cli -d <bin> db info` | Paths, IDB state, size |
+| `idalib-cli -d <bin-or-i64> db info` | Resolved paths, IDB state, size |
 
-```sh
-idalib-cli -d ./target.bin functions                      # 1. analyse (IDB auto-created)
-idalib-cli -d ./target.bin batch -- "meta" "segments" "strings" "functions -u"   # 2. overview
-idalib-cli -d ./target.i64 decompile -a 0x401000          # 3. Hex-Rays pseudo-code
-idalib-cli -d ./target.bin comments set -a 0x401000 -c "note"    # 4. annotate (persisted)
-idalib-cli parallel -d "./a.i64,./b.i64" -- "functions -u"       # 5. fan out to many DBs
+### Query
+
+| Command | Description |
+|---|---|
+| `idalib-cli -d <db> meta` | Filetype, compiler, bitness |
+| `idalib-cli -d <db> processor` | Processor info |
+| `idalib-cli -d <db> segments` | All segments |
+| `idalib-cli -d <db> segments-by-range -a <ea>` | Segment containing an address |
+| `idalib-cli -d <db> functions [-u]` | Function list (`-u` = skip lib/thunk) |
+| `idalib-cli -d <db> function -a <ea>` | One function: CFG, blocks, xrefs |
+| `idalib-cli -d <db> disasm -a <ea> [-n N]` | Disassemble N instructions (default 8) |
+| `idalib-cli -d <db> decompile -a <ea> [--all-blocks]` | Hex-Rays pseudo-code |
+| `idalib-cli -d <db> insn -a <ea>` | Single instruction |
+| `idalib-cli -d <db> strings` | String list |
+| `idalib-cli -d <db> names` | Named locations |
+| `idalib-cli -d <db> xrefs [-a <ea>] [--all]` | Xrefs to an address, or all |
+| `idalib-cli -d <db> entries` | Entry points |
+
+### Edit (persisted in the IDB)
+
+| Command | Description |
+|---|---|
+| `idalib-cli -d <db> comments get\|set\|append\|remove -a <ea> [-c "text"]` | Comments |
+| `idalib-cli -d <db> bookmarks list\|add\|get\|remove -a <ea> [-d "desc"]` | Bookmarks |
+| `idalib-cli -d <db> signatures --make [--only-pat]` | Generate FLIRT signatures |
+
+### Combine
+
+| Command | Description |
+|---|---|
+| `idalib-cli -d <db> batch -- <op> [<op>...]` | Sequential ops, IDB opened once |
+| `idalib-cli parallel -d <list\|glob> [--jobs N] -- <op>` | One op across many DBs, subprocess each |
+| `idalib-cli info [--version\|--ida\|--all]` | Tool / IDA version, license |
+
+### Scenario walkthroughs
+
+**🔎 Triage an unknown binary**
+
+```bash
+idalib-cli -d ./sample meta            # what is it? (filetype/compiler/bitness)
+idalib-cli -d ./sample segments        # memory layout
+idalib-cli -d ./sample strings         # quick hints
+idalib-cli -d ./sample functions -u    # user code only
 ```
 
-## Command reference
+**🔍 Dig into a function**
 
-> Global: `-d/--db <PATH>` selects the database (an `.i64` or a binary) —
-> required by every command · `-j/--json` forces JSON (already the default) ·
-> addresses accept `0x401000` or `401000`
-
-<details>
-<summary><b>Database management</b></summary>
-
-```sh
-idalib-cli -d <bin-or-i64> db info      # paths, IDB state, size
-idalib-cli -d <bin-or-i64> db close     # flush (state is already saved per-op)
-idalib-cli db remove -d <bin-or-i64>    # delete the IDB (never the binary)
-idalib-cli -d <bin> db open [--save/--auto-analyse]   # explicit open + analysis
+```bash
+idalib-cli -d ./sample function -a 0x401000       # CFG + blocks + xrefs
+idalib-cli -d ./sample decompile -a 0x401000      # read the pseudo-code
+idalib-cli -d ./sample disasm -a 0x401000 -n 20   # or the raw instructions
+idalib-cli -d ./sample xrefs -a 0x401000 --all    # who calls it
 ```
 
-</details>
+**📝 Annotate findings (survives across processes/agents)**
 
-<details>
-<summary><b>Database queries</b></summary>
-
-```sh
-idalib-cli segments                     # all segments
-idalib-cli segments-by-range -a <ea>    # segment containing an address
-idalib-cli functions [-u]               # -u = user code only (skip lib/thunk)
-idalib-cli function  -a <ea>            # details: CFG, blocks, xrefs
-idalib-cli disasm    -a <ea> [-n N]     # disassemble N instructions (default 8)
-idalib-cli decompile -a <ea> [--all-blocks]   # Hex-Rays pseudo-code
-idalib-cli strings | names | entries
-idalib-cli xrefs [-a <ea>] [--all]      # to an address, or across all functions
-idalib-cli meta                         # filetype / compiler / bitness
-idalib-cli processor
-idalib-cli insn      -a <ea>            # single instruction
+```bash
+idalib-cli -d ./sample comments set -a 0x401000 -c "parses config, see 0x402100"
+idalib-cli -d ./sample bookmarks add -a 0x401000 -d "entry point"
+idalib-cli -d ./sample comments get -a 0x401000    # verify
 ```
 
-</details>
+**⚡ Bulk analysis of many samples**
 
-<details>
-<summary><b>Database edits</b> (persisted in the IDB)</summary>
+```bash
+# first pass: create IDBs + overview for every sample
+idalib-cli parallel -d "./samples/*.bin" -- "batch -- meta functions -u"
 
-```sh
-idalib-cli comments get|set|append|remove -a <ea> [-c "text"]
-idalib-cli bookmarks list|add|get|remove  -a <ea> [-d "desc"]
-idalib-cli signatures --make [--only-pat]      # generate FLIRT signatures
+# deep pass: decompile one hot function in every IDB
+idalib-cli parallel -d "./samples/*.i64" --jobs 8 -- "decompile -a 0x401000"
 ```
 
-</details>
+**🤖 Agent-friendly batched inspection (one JSON doc)**
 
-<details>
-<summary><b>Batch & parallel</b></summary>
-
-```sh
-# sequential, one process, IDB opened once
-idalib-cli -d ./target.bin batch -- "meta" "segments" "decompile -a 0x401000"
-
-# one command, many databases (one subprocess each); comma list or glob
-idalib-cli parallel -d "./a.i64,./b.i64" -- "functions -u"
-idalib-cli parallel -d "./samples/*.i64" --jobs 4 -- "strings"
+```bash
+idalib-cli -d ./sample batch -- "meta" "segments" "functions -u" "decompile -a 0x401000"
 ```
 
-</details>
+Agent-oriented workflow guides live in [`skills/`](skills/); a runnable
+end-to-end example in [`examples/workflow.sh`](examples/workflow.sh).
 
 <details>
-<summary><b>Sample output</b> (<code>decompile</code>)</summary>
+<summary>Sample output (<code>decompile</code>)</summary>
 
 ```json
 {
@@ -155,63 +149,99 @@ idalib-cli parallel -d "./samples/*.i64" --jobs 4 -- "strings"
 
 </details>
 
-Agent-oriented workflow guides live in [`skills/`](skills/) — useful for
-humans too. A runnable end-to-end example: [`examples/workflow.sh`](examples/workflow.sh).
+## ⚙️ Configuration
 
-## Configuration
+Optional `~/.idapro/idalib-cli/config.toml` (base dir: `$IDALIB_CLI_HOME`):
 
-Optional `~/.idapro/idalib-cli/config.toml` (base dir overridable via
-`IDALIB_CLI_HOME`):
+| Field | Description |
+|---|---|
+| **idadir** | IDA install dir (default: auto-detected) |
+| **idb_dir** | Where new IDBs are created (default: next to the binary) |
+| **default_db** | Used when `-d` is omitted |
+| **save** | Save the IDB after each command (default `true`) |
+| **auto_analyse** | Run full auto-analysis when creating an IDB (default `true`) |
 
-```toml
-[defaults]
-idadir = "/Applications/IDA Professional 9.1.app/Contents/MacOS"
-idb_dir = "~/ida_out"      # default IDB location (otherwise next to the binary)
-default_db = "~/idbs/main.i64"   # used when -d is omitted
-save = true
-auto_analyse = true
+## ❓ FAQ
+
+<details>
+<summary>Where does the IDB go when I pass a binary?</summary>
+
+Next to the binary: `./target.bin` → `./target.bin.i64`. Set `idb_dir` in the
+config to change the location.
+
+</details>
+
+<details>
+<summary>What do batch / parallel actually do?</summary>
+
+`batch` opens the IDB once and runs every op against that handle (saves once
+at the end) — best when you need several facts about one database. `parallel`
+spawns one subprocess per database (IDALib is not thread-safe, so isolation is
+by process) with a worker pool capped by `--jobs` — best for many samples.
+`-d` accepts a single path, a comma-separated list, or a glob (`*.i64`).
+
+</details>
+
+<details>
+<summary>Can two processes use the same IDB at once?</summary>
+
+Don't. One process per IDB at a time. `parallel` respects this by spawning one
+subprocess per database; for manual multi-agent work, give each agent its own
+`-d` target.
+
+</details>
+
+<details>
+<summary>Why does building require the IDA SDK?</summary>
+
+`idalib-rs` generates its FFI bindings at compile time by parsing the SDK
+headers (bindgen). The SDK ships only with your Hex-Rays license and is never
+redistributed or embedded — the built binary links your own IDA installation
+at runtime.
+
+</details>
+
+## 📁 Project structure
+
+```
+idalib-cli/
+├── src/
+│   ├── cli.rs            # clap definitions; every command + -d/--db
+│   ├── ops/              # metadata, comments, bookmarks, db, batch, parallel, ...
+│   ├── session/          # config.toml handling
+│   └── helpers/          # JSON output views
+├── stubs/idalib/         # dev-only API stub (SDK-free checks, never shipped)
+├── tests/                # integration tests
+├── skills/               # agent workflow guides
+└── examples/workflow.sh  # runnable end-to-end example
 ```
 
-By default an IDB is created next to the analysed binary (`<binary>.i64`).
-
-## Architecture notes
-
-Flow: **load config → resolve `-d/--db` → open IDB from disk (or create next
-to the binary) → run op → save → exit**.
-
-- **Stateless**: no daemon, no registry, no session records. The IDB file is
-  the single source of truth, so databases are independent, stateful across
-  invocations, and safe to run concurrently.
-- `parallel` isolates by process (one subprocess per database) — IDALib is not
-  thread-safe for concurrent in-process DB use.
-- Output contract: one JSON document on stdout; errors to stderr, non-zero exit.
-- Bundled upstream workarounds: `EntryPointIter` infinite-loop fix (0.6.1),
-  NUL-padding sanitisation for JSON-safe strings, IDA farewell-message
-  suppression.
-
-## Versions & branches
+## 🌿 Versions & branches
 
 Tool versions are `x.y.z`; one dev + one release branch per minor:
 
-```
-main             latest development
-v0.9_dev         development branch (tool 0.9.x)
-v0.9_release     stable branch
-v0.9.1 tag       release point
-```
+| Ref | Purpose | Example |
+|---|---|---|
+| `main` | latest development (merge target of `v*_dev`) | — |
+| `v0.9_dev` | development branch for tool 0.9.x | current work |
+| `v0.9_release` | stable branch for tool 0.9.x (fixes only) | backports |
+| `v0.9.1` (tag) | release point | current release |
+
+| Tool version | Compatible IDA | idalib-rs |
+|---|---|---|
+| **0.9.x** | 9.1 | 0.6.1 (pinned `=0.6.1`) |
+| next (`v0.10_*`) | new IDA version | bumped dependency |
 
 Supporting a new IDA version = bump the `idalib` dependency, update
-`[package.metadata.ida]`, open a new branch line (`v0.10_*`).
+`[package.metadata.ida]` in `Cargo.toml`, open a new branch line (`v0.10_*`).
 
-## Distribution note
-
-This repository contains no Hex-Rays code. The build links SDK stub libraries
-(link-time shells); at runtime the binary loads the user's own IDA libraries
-and validates their license. **Never commit or redistribute the IDA SDK.**
-
-## License
+## 📄 License
 
 Distributed under the [Apache License 2.0](LICENSE). The `license` field in
 `Cargo.toml` declares `MIT OR Apache-2.0` for compatibility with
 [idalib-rs](https://github.com/idalib-rs/idalib) dependencies; this repository
-ships the Apache-2.0 text only.
+ships the Apache-2.0 text only. **Never commit or redistribute the IDA SDK.**
+
+---
+
+**[English](README.md)** · **[中文](README.zh-CN.md)**
