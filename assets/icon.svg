@@ -1,0 +1,45 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e3a8a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square background -->
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="url(#bg)"/>
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="none" stroke="#38bdf8" stroke-opacity="0.35" stroke-width="2"/>
+
+  <!-- terminal window -->
+  <rect x="18" y="22" width="92" height="84" rx="8" fill="#0f172a" stroke="url(#accent)" stroke-width="2.5"/>
+
+  <!-- window dots -->
+  <circle cx="28" cy="31" r="2.6" fill="#f87171"/>
+  <circle cx="36" cy="31" r="2.6" fill="#fbbf24"/>
+  <circle cx="44" cy="31" r="2.6" fill="#34d399"/>
+
+  <!-- separator under title bar -->
+  <line x1="18" y1="40" x2="110" y2="40" stroke="#1e293b" stroke-width="1.5"/>
+
+  <!-- prompt ">_" with blinking cursor right after it -->
+  <text x="27" y="61" font-family="ui-monospace, Menlo, Consolas, monospace"
+        font-size="15" font-weight="700" fill="url(#accent)">&gt;_</text>
+  <rect x="48" y="49" width="9" height="13" fill="url(#accent)">
+    <animate attributeName="opacity" values="1;1;0;0" dur="1.2s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- hex bytes (left column, compact) -->
+  <text x="27" y="81" font-family="ui-monospace, Menlo, Consolas, monospace"
+        font-size="8.5" fill="#94a3b8">55 48 89 E5</text>
+  <text x="27" y="96" font-family="ui-monospace, Menlo, Consolas, monospace"
+        font-size="8.5" fill="#64748b">B8 37 13 00</text>
+
+  <!-- session chips (right column, vertically stacked) -->
+  <rect x="87" y="50" width="16" height="9" rx="2.5" fill="#34d399" fill-opacity="0.9"/>
+  <rect x="87" y="63" width="16" height="9" rx="2.5" fill="#34d399" fill-opacity="0.55"/>
+  <rect x="87" y="76" width="16" height="9" rx="2.5" fill="#34d399" fill-opacity="0.25"/>
+</svg>
