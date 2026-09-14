@@ -126,7 +126,7 @@ idalib-cli parallel -d "./samples/*.i64" --jobs 8 -- "decompile -a 0x401000"
 idalib-cli -d ./sample batch -- "meta" "segments" "functions -u" "decompile -a 0x401000"
 ```
 
-面向 Agent 的工作流指南在 [`skills/`](skills/)；可运行的端到端示例在
+Agent 工作流指南：[`skills/idalib-cli/SKILL.md`](skills/idalib-cli/SKILL.md)；可运行的端到端示例在
 [`examples/workflow.sh`](examples/workflow.sh)。
 
 <details>
@@ -207,7 +207,7 @@ idalib-cli/
 │   └── helpers/          # JSON 输出视图
 ├── stubs/idalib/         # 仅开发用 API 桩（无 SDK 检查，绝不随产物发布）
 ├── tests/                # 集成测试
-├── skills/               # Agent 工作流指南
+├── skills/idalib-cli/   # 唯一的 Agent skill（工作流指南）
 └── examples/workflow.sh  # 可运行的端到端示例
 ```
 
