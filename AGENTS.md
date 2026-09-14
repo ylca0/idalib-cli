@@ -49,8 +49,8 @@ Real builds require the IDA SDK + a licensed IDA installation (see README).
 
 ## Skills
 
-Agent skills live in `skills/` and describe the tool's analysis
-workflows. Keep them in sync with any CLI changes.
+A single agent skill lives at `skills/idalib-cli/SKILL.md` and describes the
+tool's analysis workflows. Keep it in sync with any CLI changes.
 
 ## Branching & releases
 

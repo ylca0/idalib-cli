@@ -128,7 +128,7 @@ idalib-cli parallel -d "./samples/*.i64" --jobs 8 -- "decompile -a 0x401000"
 idalib-cli -d ./sample batch -- "meta" "segments" "functions -u" "decompile -a 0x401000"
 ```
 
-Agent-oriented workflow guides live in [`skills/`](skills/); a runnable
+Agent workflow guide: [`skills/idalib-cli/SKILL.md`](skills/idalib-cli/SKILL.md); a runnable
 end-to-end example in [`examples/workflow.sh`](examples/workflow.sh).
 
 <details>
@@ -212,7 +212,7 @@ idalib-cli/
 │   └── helpers/          # JSON output views
 ├── stubs/idalib/         # dev-only API stub (SDK-free checks, never shipped)
 ├── tests/                # integration tests
-├── skills/               # agent workflow guides
+├── skills/idalib-cli/   # single agent skill (workflow guide)
 └── examples/workflow.sh  # runnable end-to-end example
 ```
 
