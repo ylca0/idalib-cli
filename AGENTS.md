@@ -35,6 +35,12 @@ cargo build --release
   into release builds (it is gated behind the `stub-idalib` feature).
 - Stateless interface: every command takes `-d/--db <PATH>` (an IDB file or a
   binary). There is no session registry - the IDB file is the only state.
+- `src/ffi_ext.rs` holds hand-written `extern "C"` declarations for IDA kernel
+  symbols that `idalib-sys` 0.6.1 does not generate (set_name, bin_search,
+  xrefblk_t_first_from/next_from). All stub out under `stub-idalib`. When
+  bumping the IDA version, re-verify these ABIs against the SDK headers.
+  Known upstream bug worked around: the 0.6.1 cxx bridge for
+  `xrefblk_t_first_from` returns incoming refs (we call the kernel directly).
 - When adding a new IDALib capability, mirror the shape in `src/ops/metadata.rs`
   (or a new op file), add a clap variant in `src/cli.rs`, dispatch it in
   `src/ops/top.rs` (`run_db_op`), and extend the stub `stubs/idalib/src/*.rs`

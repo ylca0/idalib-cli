@@ -26,7 +26,7 @@
 
 ```bash
 export IDADIR="/Applications/IDA Professional 9.1.app/Contents/MacOS"  # IDA install dir
-export IDASDKDIR=$HOME/idasdk91                                        # unpacked SDK (absolute path!)
+export IDASDKDIR=/path/to/idasdk91                                     # unpacked SDK (absolute path!)
 
 git clone <this-repo> && cd idalib-cli
 cargo install --path .
@@ -47,7 +47,6 @@ non-zero exit code.
 
 | Command | Description |
 |---|---|
-| `idalib-cli -d <bin> db info` | Paths, IDB state, size |
 | `idalib-cli -d <bin-or-i64> db info` | Resolved paths, IDB state, size |
 
 ### Query
@@ -62,10 +61,14 @@ non-zero exit code.
 | `idalib-cli -d <db> function -a <ea>` | One function: CFG, blocks, xrefs |
 | `idalib-cli -d <db> disasm -a <ea> [-n N]` | Disassemble N instructions (default 8) |
 | `idalib-cli -d <db> decompile -a <ea> [--all-blocks]` | Hex-Rays pseudo-code |
-| `idalib-cli -d <db> insn -a <ea>` | Single instruction |
+| `idalib-cli -d <db> insn -a <ea>` | Single instruction (+ `group`/`is_call`/`is_ret` classification) |
 | `idalib-cli -d <db> strings` | String list |
 | `idalib-cli -d <db> names` | Named locations |
-| `idalib-cli -d <db> xrefs [-a <ea>] [--all]` | Xrefs to an address, or all |
+| `idalib-cli -d <db> xrefs [-a <ea>] [--all] [--from]` | Xrefs to an address (default) or from it (`--from`), or all |
+| `idalib-cli -d <db> find --text <s>` | Search text hits |
+| `idalib-cli -d <db> find --imm 0x1337` | Search immediate-value hits |
+| `idalib-cli -d <db> find --pattern 554889e5` | Search a hex byte pattern |
+| `idalib-cli -d <db> bytes -a <ea> [-n N] [--width byte\|word\|dword\|qword]` | Raw bytes (hexdump) or little-endian integers |
 | `idalib-cli -d <db> entries` | Entry points |
 
 ### Edit (persisted in the IDB)
@@ -74,6 +77,7 @@ non-zero exit code.
 |---|---|
 | `idalib-cli -d <db> comments get\|set\|append\|remove -a <ea> [-c "text"]` | Comments |
 | `idalib-cli -d <db> bookmarks list\|add\|get\|remove -a <ea> [-d "desc"]` | Bookmarks |
+| `idalib-cli -d <db> rename -a <ea> -n <name>` | Rename a function / data label |
 | `idalib-cli -d <db> signatures --make [--only-pat]` | Generate FLIRT signatures |
 
 ### Combine
@@ -120,6 +124,18 @@ idalib-cli parallel -d "./samples/*.bin" -- "batch -- meta functions -u"
 
 # deep pass: decompile one hot function in every IDB
 idalib-cli parallel -d "./samples/*.i64" --jobs 8 -- "decompile -a 0x401000"
+```
+
+**🔎 Search & inspect raw data**
+
+```bash
+idalib-cli -d ./sample find --text "MAGIC"            # string hits
+idalib-cli -d ./sample find --imm 0x1337              # immediate-value hits
+idalib-cli -d ./sample find --pattern 554889e5        # byte pattern (prologue)
+idalib-cli -d ./sample bytes -a 0x401000 -n 32        # hexdump
+idalib-cli -d ./sample bytes -a 0x401000 --width qword -n 4
+idalib-cli -d ./sample xrefs -a 0x401000 --from       # outgoing refs (calls)
+idalib-cli -d ./sample rename -a 0x401000 -n decrypt  # label it
 ```
 
 **🤖 Agent-friendly batched inspection (one JSON doc)**

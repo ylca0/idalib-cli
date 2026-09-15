@@ -73,6 +73,12 @@ pub enum Command {
     Processor(ProcessorCmd),
     /// Show one instruction at an address
     Insn(InsnCmd),
+    /// Search: text, immediate value, or byte pattern
+    Find(FindCmd),
+    /// Dump raw bytes / integer values at an address
+    Bytes(BytesCmd),
+    /// Rename a location (function/data label)
+    Rename(RenameCmd),
     /// Read/write comments in the database
     Comments(CommentsCmd),
     /// Manage bookmarks
@@ -189,6 +195,9 @@ pub struct XrefsCmd {
     /// Also include data xrefs (default: code only)
     #[arg(long)]
     pub all: bool,
+    /// Follow references FROM the address instead of TO it
+    #[arg(long)]
+    pub from: bool,
 }
 
 #[derive(Args, Debug)]
@@ -204,6 +213,55 @@ pub struct ProcessorCmd {}
 pub struct InsnCmd {
     #[arg(short = 'a', long, value_parser = parse_hex, required = true)]
     pub address: u64,
+}
+
+// ---------------------------------------------------------------------------
+// search / bytes / rename
+// ---------------------------------------------------------------------------
+
+#[derive(Args, Debug)]
+pub struct FindCmd {
+    /// Search text (case-insensitive substring in disassembly/strings)
+    #[arg(short = 't', long)]
+    pub text: Option<String>,
+
+    /// Search an immediate value
+    #[arg(short = 'i', long, value_parser = parse_hex)]
+    pub imm: Option<u64>,
+
+    /// Search a byte pattern, hex without spaces (e.g. 4889e5)
+    #[arg(short = 'p', long)]
+    pub pattern: Option<String>,
+
+    /// Start address for the search (default: min address)
+    #[arg(short = 's', long, value_parser = parse_hex)]
+    pub start: Option<u64>,
+}
+
+#[derive(Args, Debug)]
+pub struct BytesCmd {
+    /// Address to read from
+    #[arg(short = 'a', long, value_parser = parse_hex, required = true)]
+    pub address: u64,
+
+    /// Number of bytes to dump (default: 16)
+    #[arg(short = 'n', long, default_value_t = 16)]
+    pub count: usize,
+
+    /// Interpret as little-endian integers instead of a hexdump
+    #[arg(short = 'w', long, value_parser = ["byte", "word", "dword", "qword"])]
+    pub width: Option<String>,
+}
+
+#[derive(Args, Debug)]
+pub struct RenameCmd {
+    /// Address to rename (function start or data item)
+    #[arg(short = 'a', long, value_parser = parse_hex, required = true)]
+    pub address: u64,
+
+    /// New name (must be a valid IDA identifier)
+    #[arg(short = 'n', long, required = true)]
+    pub name: String,
 }
 
 // ---------------------------------------------------------------------------

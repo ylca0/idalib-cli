@@ -96,6 +96,8 @@ impl<'a> AddressFlags<'a> {
 }
 
 pub mod ffi {
+    use std::os::raw::{c_char, c_int, c_uchar};
+
     pub mod entry {
         pub unsafe fn get_entry_qty() -> usize {
             0
@@ -105,6 +107,103 @@ pub mod ffi {
         }
         pub unsafe fn get_entry(_ord: std::ffi::c_ulonglong) -> std::ffi::c_ulonglong {
             0
+        }
+    }
+
+    pub mod xref {
+        use std::os::raw::c_int;
+        pub const XREF_ALL: i32 = 0;
+        pub const XREF_FAR: i32 = 1;
+        pub const XREF_DATA: i32 = 2;
+
+        #[derive(Debug, Clone, Copy)]
+        #[repr(C)]
+        pub struct xrefblk_t {
+            pub from: u64,
+            pub to: u64,
+            pub iscode: bool,
+            pub type_: i32,
+            pub user: bool,
+            pub _flags: c_int,
+        }
+
+        unsafe extern "C" {
+            pub fn xrefblk_t_first_from(xb: *mut xrefblk_t, ea: u64, flags: c_int) -> bool;
+            pub fn xrefblk_t_next_from(xb: *mut xrefblk_t) -> bool;
+        }
+    }
+
+    pub mod search {
+        use std::os::raw::c_char;
+        pub unsafe fn idalib_find_text(
+            _ea: std::ffi::c_ulonglong,
+            _t: *const c_char,
+        ) -> std::ffi::c_ulonglong {
+            std::ffi::c_ulonglong::MAX
+        }
+        pub unsafe fn idalib_find_imm(
+            _ea: std::ffi::c_ulonglong,
+            _i: std::ffi::c_uint,
+        ) -> std::ffi::c_ulonglong {
+            std::ffi::c_ulonglong::MAX
+        }
+        pub unsafe fn idalib_find_defined(_ea: std::ffi::c_ulonglong) -> std::ffi::c_ulonglong {
+            std::ffi::c_ulonglong::MAX
+        }
+    }
+
+    pub mod bytes {
+        pub unsafe fn idalib_get_byte(_ea: std::ffi::c_ulonglong) -> u8 {
+            0
+        }
+        pub unsafe fn idalib_get_word(_ea: std::ffi::c_ulonglong) -> u16 {
+            0
+        }
+        pub unsafe fn idalib_get_dword(_ea: std::ffi::c_ulonglong) -> u32 {
+            0
+        }
+        pub unsafe fn idalib_get_qword(_ea: std::ffi::c_ulonglong) -> u64 {
+            0
+        }
+        pub unsafe fn idalib_get_bytes(_ea: std::ffi::c_ulonglong, _buf: &mut Vec<u8>) -> usize {
+            0
+        }
+        pub unsafe fn get_flags(_ea: std::ffi::c_ulonglong) -> u64 {
+            0
+        }
+        pub unsafe fn is_code(_ea: std::ffi::c_ulonglong) -> bool {
+            false
+        }
+        pub unsafe fn is_data(_ea: std::ffi::c_ulonglong) -> bool {
+            false
+        }
+    }
+
+    pub mod util {
+        use std::os::raw::{c_int, c_uchar};
+        pub unsafe fn is_call_insn(_ea: std::ffi::c_ulonglong) -> bool {
+            false
+        }
+        pub unsafe fn is_ret_insn(_ea: std::ffi::c_ulonglong, _strict: c_uchar) -> bool {
+            false
+        }
+        pub unsafe fn is_indirect_jump_insn(_ea: std::ffi::c_ulonglong) -> bool {
+            false
+        }
+        pub unsafe fn is_align_insn(_ea: std::ffi::c_ulonglong) -> c_int {
+            0
+        }
+        pub unsafe fn next_head(
+            _ea: std::ffi::c_ulonglong,
+            _m: std::ffi::c_ulonglong,
+        ) -> std::ffi::c_ulonglong {
+            std::ffi::c_ulonglong::MAX
+        }
+        pub unsafe fn prev_head(
+            _ea: std::ffi::c_ulonglong,
+            _m: std::ffi::c_ulonglong,
+        ) -> std::ffi::c_ulonglong {
+            std::ffi::c_ulonglong::MAX
         }
     }
 }

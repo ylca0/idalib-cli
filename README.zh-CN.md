@@ -26,7 +26,7 @@
 
 ```bash
 export IDADIR="/Applications/IDA Professional 9.1.app/Contents/MacOS"  # IDA 安装目录
-export IDASDKDIR=$HOME/idasdk91                                        # 解压后的 SDK（必须绝对路径）
+export IDASDKDIR=/path/to/idasdk91                                     # 解压后的 SDK（必须绝对路径）
 
 git clone <this-repo> && cd idalib-cli
 cargo install --path .
@@ -60,10 +60,14 @@ idalib-cli info    # ✅ 验证工具版本、IDA 版本、许可证
 | `idalib-cli -d <db> function -a <ea>` | 单个函数：CFG、基本块、xrefs |
 | `idalib-cli -d <db> disasm -a <ea> [-n N]` | 反汇编 N 条指令（默认 8） |
 | `idalib-cli -d <db> decompile -a <ea> [--all-blocks]` | Hex-Rays 伪代码 |
-| `idalib-cli -d <db> insn -a <ea>` | 单条指令 |
+| `idalib-cli -d <db> insn -a <ea>` | 单条指令（含 `group`/`is_call`/`is_ret` 分类） |
 | `idalib-cli -d <db> strings` | 字符串列表 |
 | `idalib-cli -d <db> names` | 命名位置 |
-| `idalib-cli -d <db> xrefs [-a <ea>] [--all]` | 到某地址的交叉引用，或全部 |
+| `idalib-cli -d <db> xrefs [-a <ea>] [--all] [--from]` | 交叉引用：默认到某地址，`--from` 为流出引用，或全部 |
+| `idalib-cli -d <db> find --text <串>` | 搜索文本命中 |
+| `idalib-cli -d <db> find --imm 0x1337` | 搜索立即数命中 |
+| `idalib-cli -d <db> find --pattern 554889e5` | 搜索十六进制字节模式 |
+| `idalib-cli -d <db> bytes -a <ea> [-n N] [--width byte\|word\|dword\|qword]` | 原始字节（hexdump）或小端整数 |
 | `idalib-cli -d <db> entries` | 入口点 |
 
 ### 编辑（持久化进 IDB）
@@ -72,6 +76,7 @@ idalib-cli info    # ✅ 验证工具版本、IDA 版本、许可证
 |---|---|
 | `idalib-cli -d <db> comments get\|set\|append\|remove -a <ea> [-c "文本"]` | 注释 |
 | `idalib-cli -d <db> bookmarks list\|add\|get\|remove -a <ea> [-d "描述"]` | 书签 |
+| `idalib-cli -d <db> rename -a <ea> -n <名称>` | 重命名函数 / 数据标签 |
 | `idalib-cli -d <db> signatures --make [--only-pat]` | 生成 FLIRT 签名 |
 
 ### 组合
@@ -118,6 +123,18 @@ idalib-cli parallel -d "./samples/*.bin" -- "batch -- meta functions -u"
 
 # 第二遍：在每个 IDB 里反编译同一个热点函数
 idalib-cli parallel -d "./samples/*.i64" --jobs 8 -- "decompile -a 0x401000"
+```
+
+**🔎 搜索与原始数据**
+
+```bash
+idalib-cli -d ./sample find --text "MAGIC"            # 字符串命中
+idalib-cli -d ./sample find --imm 0x1337              # 立即数命中
+idalib-cli -d ./sample find --pattern 554889e5        # 字节模式（函数序言）
+idalib-cli -d ./sample bytes -a 0x401000 -n 32        # hexdump
+idalib-cli -d ./sample bytes -a 0x401000 --width qword -n 4
+idalib-cli -d ./sample xrefs -a 0x401000 --from       # 流出引用（call 边）
+idalib-cli -d ./sample rename -a 0x401000 -n decrypt  # 命名
 ```
 
 **🤖 Agent 式批量取证（一个 JSON 文档）**

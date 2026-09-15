@@ -5,5 +5,6 @@ pub mod db;
 pub mod info;
 pub mod metadata;
 pub mod parallel;
+pub mod search;
 pub mod signatures;
 pub mod top;

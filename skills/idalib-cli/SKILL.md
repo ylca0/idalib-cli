@@ -49,7 +49,10 @@ If it errors, the tool isn't built/installed — see the repo README (needs
 | Hex-Rays pseudo-code | `-d <db> decompile -a <ea>` |
 | Single instruction | `-d <db> insn -a <ea>` |
 | Strings / names / entries | `-d <db> strings` / `names` / `entries` |
-| Xrefs to an address / all | `-d <db> xrefs [-a <ea>] [--all]` |
+| Xrefs to / from an address | `-d <db> xrefs [-a <ea>] [--all] [--from]` |
+| Search text / immediate / bytes | `-d <db> find --text S` / `--imm 0xV` / `--pattern 4889e5` |
+| Raw bytes / integers | `-d <db> bytes -a <ea> [-n N] [--width byte\|word\|dword\|qword]` |
+| Rename a function / label | `-d <db> rename -a <ea> -n <name>` |
 | Comments (get/set/append/remove) | `-d <db> comments <verb> -a <ea> [-c "text"]` |
 | Bookmarks (list/add/get/remove) | `-d <db> bookmarks <verb> -a <ea> [-d "desc"]` |
 | FLIRT signatures | `-d <db> signatures --make` |
@@ -75,15 +78,20 @@ idalib-cli -d ./sample function -a 0x401000      # CFG + blocks + xrefs
 idalib-cli -d ./sample disasm -a 0x401000 -n 20  # raw instructions
 ```
 
-**3. Follow the data** — who references what?
+**3. Follow the data** — who references what / what does it reference?
 
 ```sh
-idalib-cli -d ./sample xrefs -a 0x401000 --all
+idalib-cli -d ./sample xrefs -a 0x401000 --all        # incoming
+idalib-cli -d ./sample xrefs -a 0x401000 --from --all # outgoing (calls)
+idalib-cli -d ./sample find --text "MAGIC"            # locate a string
+idalib-cli -d ./sample find --imm 0x1337              # locate a magic constant
+idalib-cli -d ./sample bytes -a 0x401000 -n 32        # raw bytes
 ```
 
-**4. Annotate** — persist findings for future turns/agents.
+**4. Name & annotate** — persist findings for future turns/agents.
 
 ```sh
+idalib-cli -d ./sample rename -a 0x401000 -n parse_config
 idalib-cli -d ./sample comments set -a 0x401000 -c "parses config, see 0x402100"
 idalib-cli -d ./sample bookmarks add -a 0x401000 -d "entry point"
 ```
