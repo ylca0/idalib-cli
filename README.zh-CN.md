@@ -77,6 +77,7 @@ idalib-cli info    # ✅ 验证工具版本、IDA 版本、许可证
 | `idalib-cli -d <db> comments get\|set\|append\|remove -a <ea> [-c "文本"]` | 注释 |
 | `idalib-cli -d <db> bookmarks list\|add\|get\|remove -a <ea> [-d "描述"]` | 书签 |
 | `idalib-cli -d <db> rename -a <ea> -n <名称>` | 重命名函数 / 数据标签 |
+| `idalib-cli -d <db> set-type -a <ea> -t "int f(int, char *);"` | 应用 C 类型声明（函数原型 / 数据类型） |
 | `idalib-cli -d <db> signatures --make [--only-pat]` | 生成 FLIRT 签名 |
 
 ### 组合
@@ -135,6 +136,7 @@ idalib-cli -d ./sample bytes -a 0x401000 -n 32        # hexdump
 idalib-cli -d ./sample bytes -a 0x401000 --width qword -n 4
 idalib-cli -d ./sample xrefs -a 0x401000 --from       # 流出引用（call 边）
 idalib-cli -d ./sample rename -a 0x401000 -n decrypt  # 命名
+idalib-cli -d ./sample set-type -a 0x401000 -t "int f(const char *, int);"  # 设原型
 ```
 
 **🤖 Agent 式批量取证（一个 JSON 文档）**

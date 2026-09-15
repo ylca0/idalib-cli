@@ -396,6 +396,29 @@ pub fn insn_enriched(idb: &IDB, ea: Address) -> Result<Out> {
 // rename (B 档：ffi_ext::set_name)
 // ---------------------------------------------------------------------------
 
+/// Apply a C type declaration at `ea` (function prototype or data type)
+/// via the IDA kernel's `apply_cdecl`. The declaration is plain C, e.g.
+/// `int f(const char *, int)` for a prototype or `char arr[16]` for data.
+pub fn set_type(_idb: &IDB, ea: Address, decl: &str) -> Result<Out> {
+    let decl = decl.trim();
+    if decl.is_empty() {
+        bail!("type declaration must not be empty");
+    }
+    let c = CString::new(decl).context("declaration contains NUL")?;
+    let ok = unsafe { ffi_ext::apply_cdecl(ea, c.as_ptr(), 0) };
+    if !ok {
+        bail!(
+            "apply_cdecl failed at {ea:#x} for {decl:?} (parse error, unknown type, or bad address; \
+             declarations must be valid C, end with ';', and use unnamed parameters)"
+        );
+    }
+    Ok(Out::Value(serde_json::json!({
+        "ok": true,
+        "address": format!("0x{ea:x}"),
+        "type": decl,
+    })))
+}
+
 /// Rename the item at `ea` via the IDA kernel's `set_name`.
 pub fn rename(_idb: &IDB, ea: Address, name: &str) -> Result<Out> {
     if name.is_empty() {
