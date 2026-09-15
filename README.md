@@ -26,7 +26,7 @@
 
 ```bash
 export IDADIR="/Applications/IDA Professional 9.1.app/Contents/MacOS"  # IDA install dir
-export IDASDKDIR=$HOME/idasdk91                                        # unpacked SDK (absolute path!)
+export IDASDKDIR=/path/to/idasdk91                                     # unpacked SDK (absolute path!)
 
 git clone <this-repo> && cd idalib-cli
 cargo install --path .
