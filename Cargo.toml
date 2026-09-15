@@ -32,7 +32,7 @@ serde_json = "1"
 [features]
 default = ["real-idalib"]
 # Real build against idalib-rs 0.6.1 (requires the IDA 9.1 SDK via IDASDKDIR).
-real-idalib = ["dep:idalib"]
+real-idalib = ["dep:idalib", "dep:autocxx"]
 # Dev-only: use a local stub of `idalib` so the rest of the codebase can be
 # typechecked and tested without the IDA SDK installed. Never enable in
 # release/production builds. Usage:
@@ -42,6 +42,10 @@ stub-idalib = ["dep:idalib-stub"]
 [dependencies.idalib]
 version = "=0.6.1"
 default-features = false
+optional = true
+
+[dependencies.autocxx]
+version = "0.28"
 optional = true
 
 [dependencies.idalib-stub]

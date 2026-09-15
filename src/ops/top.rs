@@ -80,13 +80,32 @@ pub(crate) fn run_db_op(cli: &cli::Cli, idb: &mut IDB) -> Result<Out> {
         )?)),
         Command::Strings(s) => Ok(Out::Strings(crate::ops::metadata::strings(idb, s.all))),
         Command::Names(_) => Ok(Out::Names(crate::ops::metadata::names(idb))),
-        Command::Xrefs(x) => Ok(Out::Xrefs(crate::ops::metadata::xrefs(
-            idb, x.address, x.all,
-        )?)),
+        Command::Xrefs(x) => {
+            if x.from {
+                let Some(ea) = x.address else {
+                    anyhow::bail!("xrefs --from requires -a <ea>");
+                };
+                Ok(Out::Xrefs(crate::ops::search::xrefs_from(idb, ea, x.all)?))
+            } else {
+                Ok(Out::Xrefs(crate::ops::metadata::xrefs(
+                    idb, x.address, x.all,
+                )?))
+            }
+        }
         Command::Entries(_) => Ok(Out::Entries(crate::ops::metadata::entries(idb))),
         Command::Meta(_) => Ok(Out::Metadata(crate::ops::metadata::meta(idb))),
         Command::Processor(_) => Ok(Out::Processor(crate::ops::metadata::processor(idb))),
         Command::Insn(i) => Ok(Out::Insn(crate::ops::metadata::insn(idb, i.address)?)),
+        Command::Find(f) => crate::ops::search::find(
+            idb,
+            f.text.as_deref(),
+            f.imm,
+            f.pattern.as_deref(),
+            f.start,
+            256,
+        ),
+        Command::Bytes(b) => crate::ops::search::bytes(idb, b.address, b.count, b.width.as_deref()),
+        Command::Rename(r) => crate::ops::search::rename(idb, r.address, &r.name),
         Command::Comments(c) => Ok(Out::Comment(crate::ops::comments::dispatch(idb, c)?)),
         Command::Bookmarks(b) => Ok(Out::Bookmarks(crate::ops::bookmarks::dispatch(idb, b)?)),
         Command::Signatures(s) => Ok(Out::Ok(crate::ops::signatures::dispatch(idb, s)?)),

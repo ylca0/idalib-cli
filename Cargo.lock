@@ -522,6 +522,7 @@ name = "idalib-cli"
 version = "0.9.1"
 dependencies = [
  "anyhow",
+ "autocxx",
  "clap",
  "idalib 0.6.1",
  "idalib 0.6.1+9.1.250226",

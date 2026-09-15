@@ -8,6 +8,7 @@ use crate::idalib::{
 };
 
 use crate::helpers::json_types as jt;
+use crate::ops::top::Out;
 
 pub fn segments(idb: &IDB) -> Vec<jt::SegmentView> {
     idb.segments()
@@ -222,8 +223,13 @@ pub fn processor(idb: &IDB) -> jt::ProcessorView {
 }
 
 pub fn insn(idb: &IDB, ea: Address) -> Result<jt::InsnView> {
-    let i = idb.insn_at(ea).context("no instruction at address")?;
-    Ok(jt::InsnView::from_insn(&i))
+    match crate::ops::search::insn_enriched(idb, ea) {
+        Ok(Out::Insn(v)) => Ok(v),
+        _ => {
+            let i = idb.insn_at(ea).context("no instruction at address")?;
+            Ok(jt::InsnView::from_insn(&i))
+        }
+    }
 }
 
 fn function_view(fid: usize, f: &Function) -> jt::FunctionView {

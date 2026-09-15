@@ -39,6 +39,14 @@ pub struct InsnView {
     pub size: usize,
     pub operand_count: usize,
     pub operands: Vec<OperandView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_call: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_ret: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_indirect_jump: Option<bool>,
 }
 
 impl InsnView {
@@ -52,6 +60,10 @@ impl InsnView {
             size: i.len(),
             operand_count: i.operand_count(),
             operands,
+            group: None,
+            is_call: None,
+            is_ret: None,
+            is_indirect_jump: None,
         }
     }
 }
