@@ -106,6 +106,7 @@ pub(crate) fn run_db_op(cli: &cli::Cli, idb: &mut IDB) -> Result<Out> {
         ),
         Command::Bytes(b) => crate::ops::search::bytes(idb, b.address, b.count, b.width.as_deref()),
         Command::Rename(r) => crate::ops::search::rename(idb, r.address, &r.name),
+        Command::SetType(t) => crate::ops::search::set_type(idb, t.address, &t.decl),
         Command::Comments(c) => Ok(Out::Comment(crate::ops::comments::dispatch(idb, c)?)),
         Command::Bookmarks(b) => Ok(Out::Bookmarks(crate::ops::bookmarks::dispatch(idb, b)?)),
         Command::Signatures(s) => Ok(Out::Ok(crate::ops::signatures::dispatch(idb, s)?)),

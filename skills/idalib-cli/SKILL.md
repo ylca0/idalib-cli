@@ -53,6 +53,7 @@ If it errors, the tool isn't built/installed — see the repo README (needs
 | Search text / immediate / bytes | `-d <db> find --text S` / `--imm 0xV` / `--pattern 4889e5` |
 | Raw bytes / integers | `-d <db> bytes -a <ea> [-n N] [--width byte\|word\|dword\|qword]` |
 | Rename a function / label | `-d <db> rename -a <ea> -n <name>` |
+| Apply a C type (prototype / data) | `-d <db> set-type -a <ea> -t "int f(int, char *);"` |
 | Comments (get/set/append/remove) | `-d <db> comments <verb> -a <ea> [-c "text"]` |
 | Bookmarks (list/add/get/remove) | `-d <db> bookmarks <verb> -a <ea> [-d "desc"]` |
 | FLIRT signatures | `-d <db> signatures --make` |
@@ -92,6 +93,7 @@ idalib-cli -d ./sample bytes -a 0x401000 -n 32        # raw bytes
 
 ```sh
 idalib-cli -d ./sample rename -a 0x401000 -n parse_config
+idalib-cli -d ./sample set-type -a 0x401000 -t "int parse_config(const char *);"
 idalib-cli -d ./sample comments set -a 0x401000 -c "parses config, see 0x402100"
 idalib-cli -d ./sample bookmarks add -a 0x401000 -d "entry point"
 ```

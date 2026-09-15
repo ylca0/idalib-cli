@@ -79,6 +79,8 @@ pub enum Command {
     Bytes(BytesCmd),
     /// Rename a location (function/data label)
     Rename(RenameCmd),
+    /// Apply a C type declaration (function prototype or data type)
+    SetType(SetTypeCmd),
     /// Read/write comments in the database
     Comments(CommentsCmd),
     /// Manage bookmarks
@@ -262,6 +264,19 @@ pub struct RenameCmd {
     /// New name (must be a valid IDA identifier)
     #[arg(short = 'n', long, required = true)]
     pub name: String,
+}
+
+#[derive(Args, Debug)]
+pub struct SetTypeCmd {
+    /// Address to apply the type at (function start or data item)
+    #[arg(short = 'a', long, value_parser = parse_hex, required = true)]
+    pub address: u64,
+
+    /// C declaration, e.g. "int f(const char *, int)" (function) or
+    /// "char arr[16]" (data). Use quotes; multiple names may need a til file
+    /// already loaded in the IDB.
+    #[arg(short = 't', long, required = true)]
+    pub decl: String,
 }
 
 // ---------------------------------------------------------------------------

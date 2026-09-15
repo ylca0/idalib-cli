@@ -78,6 +78,7 @@ non-zero exit code.
 | `idalib-cli -d <db> comments get\|set\|append\|remove -a <ea> [-c "text"]` | Comments |
 | `idalib-cli -d <db> bookmarks list\|add\|get\|remove -a <ea> [-d "desc"]` | Bookmarks |
 | `idalib-cli -d <db> rename -a <ea> -n <name>` | Rename a function / data label |
+| `idalib-cli -d <db> set-type -a <ea> -t "int f(int, char *);"` | Apply a C type declaration (function prototype / data type) |
 | `idalib-cli -d <db> signatures --make [--only-pat]` | Generate FLIRT signatures |
 
 ### Combine
@@ -136,6 +137,7 @@ idalib-cli -d ./sample bytes -a 0x401000 -n 32        # hexdump
 idalib-cli -d ./sample bytes -a 0x401000 --width qword -n 4
 idalib-cli -d ./sample xrefs -a 0x401000 --from       # outgoing refs (calls)
 idalib-cli -d ./sample rename -a 0x401000 -n decrypt  # label it
+idalib-cli -d ./sample set-type -a 0x401000 -t "int f(const char *, int);"  # set prototype
 ```
 
 **🤖 Agent-friendly batched inspection (one JSON doc)**

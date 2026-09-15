@@ -67,6 +67,24 @@ pub unsafe fn bin_search(
     u64::MAX
 }
 
+/// `idaman bool ida_export apply_cdecl(til_t *til, ea_t ea,
+///                                     const char *decl, int flags=0);`
+/// flags == 0 -> TINFO_DEFINITE (always passed upstream).
+/// `til` is the global type library handle from `get_idati()`.
+#[cfg(not(feature = "stub-idalib"))]
+pub unsafe fn apply_cdecl(ea: u64, decl: *const c_char, flags: c_int) -> bool {
+    unsafe { raw::apply_cdecl(raw::get_idati(), ea, decl, flags) }
+}
+
+/// Stub no-op: always reports failure.
+///
+/// # Safety
+/// Arguments are ignored; provided for signature parity with the real FFI.
+#[cfg(feature = "stub-idalib")]
+pub unsafe fn apply_cdecl(_ea: u64, _decl: *const c_char, _flags: c_int) -> bool {
+    false
+}
+
 /// Raw C layout of the SDK `xrefblk_t` (fields exactly as in xref.hpp).
 #[cfg(not(feature = "stub-idalib"))]
 #[derive(Debug, Clone, Copy)]
@@ -92,7 +110,7 @@ pub unsafe fn xrefblk_next_from(blk: *mut XrefBlk) -> bool {
 
 #[cfg(not(feature = "stub-idalib"))]
 mod raw {
-    use std::os::raw::{c_char, c_int, c_uchar};
+    use std::os::raw::{c_char, c_int, c_uchar, c_void};
 
     unsafe extern "C" {
         pub fn set_name(ea: u64, name: *const c_char, flags: c_int) -> bool;
@@ -106,5 +124,7 @@ mod raw {
         ) -> u64;
         pub fn xrefblk_t_first_from(blk: *mut super::XrefBlk, from: u64, flags: c_int) -> bool;
         pub fn xrefblk_t_next_from(blk: *mut super::XrefBlk) -> bool;
+        pub fn get_idati() -> *mut c_void;
+        pub fn apply_cdecl(til: *mut c_void, ea: u64, decl: *const c_char, flags: c_int) -> bool;
     }
 }
